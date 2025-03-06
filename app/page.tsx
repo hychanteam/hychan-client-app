@@ -51,9 +51,8 @@ export default function Home() {
             Coming Soon
           </button>
 
-          <div className="mt-4 space-y-2">
-            <p className="text-xl text-teal-300 font-bold opacity-90">at your own risk</p>
-            <p className="text-xl opacity-80">we advise you to be liquid</p>
+          <div className="mt-12 space-y-2">
+            <p className="text-2xl text-teal-300 opacity-80">we advise you to be liquid</p>
           </div>
 
           <div className="max-w-sm mx-auto mt-12 text-center">
