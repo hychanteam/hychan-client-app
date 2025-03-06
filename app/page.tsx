@@ -53,7 +53,7 @@ export default function Home() {
 
           <div className="mt-4 space-y-2">
             <p className="text-xl text-teal-300 font-bold opacity-90">at your own risk</p>
-            <p className="text-xl opacity-80">we advice you to be liquid</p>
+            <p className="text-xl opacity-80">we advise you to be liquid</p>
           </div>
 
           <div className="max-w-sm mx-auto mt-12 text-center">
