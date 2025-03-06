@@ -9,7 +9,7 @@ const inter = Inter({ subsets: ["latin"] });
 export const metadata: Metadata = {
   title: "HYCHAN",
   description:
-    "HYCHAN is a next-generation NFT project built on Hyperliquid, merging cybernetic aesthetics with cutting-edge trading mechanics.",
+    "The first anime NFT on Hyperliquid. Cyber waifus, zero patience, 100% degen. You either get in early or cry later. Just dominance.",
 };
 
 export default function RootLayout({
