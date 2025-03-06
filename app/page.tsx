@@ -5,7 +5,6 @@ import Image from "next/image"
 export default function Home() {
   return (
     <main className="min-h-screen bg-teal-800 text-white flex flex-col relative overflow-hidden">
-      {/* Background image with overlay */}
       <div className="absolute inset-0 z-0">
         <Image
           src="/assets/images/png/landing-background.png"
@@ -14,12 +13,11 @@ export default function Home() {
           priority
           className="object-cover object-center"
         />
-        <div className="absolute inset-0 bg-teal-800/50" /> {/* Overlay to maintain the teal effect */}
+        <div className="absolute inset-0 bg-teal-800/50" />
       </div>
 
       <div className="container mx-auto px-4 py-6 flex-1 flex flex-col relative z-10">
         <header className="flex justify-center md:justify-between items-center h-12">
-          {/* Logo image - centered on mobile, left-aligned on desktop */}
           <div className="w-32 md:w-40">
             <Image
               src="/assets/images/png/title.png"
@@ -30,7 +28,6 @@ export default function Home() {
             />
           </div>
 
-          {/* Coming Soon button - hidden on mobile */}
           <button className="hidden md:block bg-transparent border border-white/30 text-white py-2 px-6 rounded-[8px] hover:bg-white/10 transition-colors">
             Connecting Soon
           </button>
@@ -69,7 +66,7 @@ export default function Home() {
         </div>
 
         <div className="flex justify-center gap-4 mt-auto mb-8">
-          <Link href="#" className="border border-white/30 p-3 rounded-md hover:bg-white/10 transition-colors">
+          <Link href="https://x.com/hychanhl" target="_blank" className="border border-white/30 p-3 rounded-md hover:bg-white/10 transition-colors">
             <FaXTwitter size={24} />
           </Link>
           <Link href="#" className="border border-white/30 p-3 rounded-md hover:bg-white/10 transition-colors">
