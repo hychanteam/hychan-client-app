@@ -68,7 +68,7 @@ export default function Home() {
           <Link href="https://x.com/hychanhl" target="_blank" className="border border-white/30 p-3 rounded-md hover:bg-white/10 transition-colors">
             <FaXTwitter size={24} />
           </Link>
-          <Link href="#" className="border border-white/30 p-3 rounded-md hover:bg-white/10 transition-colors">
+          <Link href="https://discord.gg/hychanhl" className="border border-white/30 p-3 rounded-md hover:bg-white/10 transition-colors">
             <FaDiscord size={24} />
           </Link>
         </div>
