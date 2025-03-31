@@ -83,16 +83,10 @@ export async function POST(request: Request) {
 
       // Parse Discord roles from the string format ["ROLE1","ROLE2"]
       let discordRoles: string[] = []
-      try {
-        if (walletData.dcRole) {
-          // Handle the format in the database which appears to be a string like ["FOGCHAN","FLASHCHAN"]
-          discordRoles = JSON.parse(walletData.dcRole.replace(/'/g, '"'))
-        }
-      } catch (e: any) {
-        // If parsing fails, try to extract roles using regex
-        const roleMatches = walletData.dcRole?.match(/"([^"]+)"/g) || []
-        discordRoles = roleMatches.map((match:any) => match.replace(/"/g, ""))
-      }
+      
+      // If parsing fails, try to extract roles using regex
+      const roleMatches = walletData.dcRole?.match(/"([^"]+)"/g) || []
+      discordRoles = roleMatches.map((match:any) => match.replace(/"/g, ""))
 
       // Check if eligible (has any mints allocated)
       const isEligible = walletData.allowedMintsGTD > 0 || walletData.allowedMintsFCFS > 0
