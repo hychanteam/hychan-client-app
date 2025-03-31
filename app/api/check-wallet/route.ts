@@ -88,7 +88,7 @@ export async function POST(request: Request) {
           // Handle the format in the database which appears to be a string like ["FOGCHAN","FLASHCHAN"]
           discordRoles = JSON.parse(walletData.dcRole.replace(/'/g, '"'))
         }
-      } catch (e) {
+      } catch (e: any) {
         // If parsing fails, try to extract roles using regex
         const roleMatches = walletData.dcRole?.match(/"([^"]+)"/g) || []
         discordRoles = roleMatches.map((match:any) => match.replace(/"/g, ""))
