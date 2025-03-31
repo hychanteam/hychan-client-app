@@ -5,6 +5,8 @@ import { useState } from "react"
 import Link from "next/link"
 import Image from "next/image"
 import { ArrowLeft, Check, XIcon, Loader2 } from "lucide-react"
+import Confetti from "react-confetti"
+import { useWindowSize } from "react-use"
 
 type EligibilityResult = {
   eligible: boolean
@@ -21,6 +23,8 @@ export default function CheckWallet() {
   const [isChecking, setIsChecking] = useState(false)
   const [checkResult, setCheckResult] = useState<EligibilityResult | null>(null)
   const [error, setError] = useState("")
+  const [showConfetti, setShowConfetti] = useState(false)
+  const { width, height } = useWindowSize()
 
   // Function to validate EVM address format
   const isValidEVMAddress = (address: string) => {
@@ -52,6 +56,11 @@ export default function CheckWallet() {
       }
 
       setCheckResult(result)
+      if (result.eligible) {
+        setShowConfetti(true)
+        // Hide confetti after 5 seconds
+        setTimeout(() => setShowConfetti(false), 5000)
+      }
     } catch (err) {
       console.error("Error details:", err)
       setError(
@@ -82,6 +91,69 @@ export default function CheckWallet() {
 
   return (
     <main className="min-h-screen bg-teal-800 text-white flex flex-col relative overflow-hidden">
+      {showConfetti && (
+        <Confetti
+        width={width}
+        height={height}
+        recycle={false}
+        numberOfPieces={800}
+        gravity={0.25}
+        initialVelocityY={30}
+        initialVelocityX={15}
+        tweenDuration={50}
+        colors={["#5eead4", "#2dd4bf", "#14b8a6", "#0d9488", "#0f766e", "#ffffff"]}
+        confettiSource={{
+          x: 0,
+          y: height / 2,
+          w: width, // Wider source area
+          h: height, // Taller source area
+        }}
+        drawShape={(ctx) => {
+          // Mix of different shapes for more variety
+          const random = Math.random()
+          if (random < 0.33) {
+            // Circle
+            ctx.beginPath()
+            ctx.arc(0, 0, 7, 0, 2 * Math.PI)
+            ctx.fill()
+          } else if (random < 0.66) {
+            // Square
+            ctx.fillRect(-5, -5, 10, 10)
+          } else {
+            // Star
+            const spikes = 5
+            const outerRadius = 7
+            const innerRadius = 3
+
+            let rot = (Math.PI / 2) * 3
+            let x = 0
+            let y = 0
+            const step = Math.PI / spikes
+
+            ctx.beginPath()
+            ctx.moveTo(x, y - outerRadius)
+
+            for (let i = 0; i < spikes; i++) {
+              x = Math.cos(rot) * outerRadius
+              y = Math.sin(rot) * outerRadius
+              ctx.lineTo(x, y)
+              rot += step
+
+              x = Math.cos(rot) * innerRadius
+              y = Math.sin(rot) * innerRadius
+              ctx.lineTo(x, y)
+              rot += step
+            }
+
+            ctx.lineTo(0, -outerRadius)
+            ctx.closePath()
+            ctx.fill()
+          }
+        }}
+        wind={0.01}
+        friction={0.97}
+      />
+      )}
       {/* Background image with overlay */}
       <div className="absolute inset-0 z-0">
         <Image
