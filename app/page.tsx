@@ -47,9 +47,17 @@ export default function Home() {
             </div>
           </h2>
 
-          <button className="bg-teal-400 hover:bg-teal-300 text-white py-3 px-12 rounded-md text-2xl font-medium tracking-wider transition-colors mt-0">
-            Coming Soon
-          </button>
+          <div className="flex flex-col sm:flex-row gap-4 mt-0">
+            <button className="bg-teal-400 hover:bg-teal-300 text-white py-3 px-12 rounded-md text-2xl font-medium tracking-wider transition-colors">
+              Coming Soon
+            </button>
+
+            <Link href="/check-wallet">
+              <button className="bg-transparent border border-white/30 hover:bg-white/10 text-white py-3 px-12 rounded-md text-2xl font-medium tracking-wider transition-colors">
+                Check Wallet
+              </button>
+            </Link>
+          </div>
 
           <div className="mt-12 space-y-2">
             <p className="text-2xl text-teal-300 opacity-80">we advise you to be liquid</p>
