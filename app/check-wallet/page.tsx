@@ -174,16 +174,16 @@ export default function CheckWallet() {
           </Link>
         </header>
 
-        <div className="flex-1 flex flex-col items-center justify-center text-center relative mt-8">
-          <div className="text-4xl md:text-7xl font-bold tracking-wider mt-2">
-                <Image
-                    src="/assets/images/png/title-large.png"
-                    alt="HYCHAN"
-                    width={200} // Smaller width for mobile
-                    height={60}
-                    className="mx-auto md:w-[300px] md:h-[90px]"
-                />
-            </div>
+        <div className="flex-1 flex flex-col items-center justify-center text-center relative mt-4">
+          <div className="text-4xl md:text-7xl font-bold tracking-wider">
+              <Image
+                  src="/assets/images/png/title-large.png"
+                  alt="HYCHAN"
+                  width={200} // Smaller width for mobile
+                  height={60}
+                  className="mx-auto md:w-[300px] md:h-[90px]"
+              />
+          </div>
 
           <h1 className="text-3xl md:text-4xl font-bold mb-8 mt-6">Wallet Checker</h1>
 
