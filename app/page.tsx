@@ -48,9 +48,11 @@ export default function Home() {
           </h2>
 
           <div className="flex flex-col sm:flex-row gap-4 mt-0">
-            <button className="bg-teal-400 hover:bg-teal-300 text-white py-3 px-12 rounded-md text-2xl font-medium tracking-wider transition-colors">
-              Coming Soon
-            </button>
+            <Link href="/mint">
+              <button className="bg-teal-400 hover:bg-teal-300 text-white py-3 px-12 rounded-md text-2xl font-medium tracking-wider transition-colors">
+                Enter The Arena
+              </button>
+            </Link>
 
             <Link href="/check-wallet">
               <button className="bg-transparent border border-white/30 hover:bg-white/10 text-white py-3 px-12 rounded-md text-2xl font-medium tracking-wider transition-colors">
