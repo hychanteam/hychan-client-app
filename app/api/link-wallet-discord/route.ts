@@ -103,27 +103,6 @@ export async function POST(request: Request) {
         )
       }
 
-      // If the wallet already has the same Discord ID, no need to update
-      if (walletData[0].dcId === discordId) {
-        console.log("Wallet already linked to this Discord ID, skipping update")
-      } else {
-        // Update the wallet with the Discord ID
-        const { error: updateError } = await supabase
-          .from("master_hype_evm_wallet_mint_details")
-          .update({ dcId: discordId })
-          .eq("address", walletAddress.toLowerCase())
-
-        if (updateError) {
-          console.error("Error updating wallet with Discord ID:", updateError)
-          return NextResponse.json(
-            {
-              error: `Failed to link wallet with Discord ID: ${updateError.message}`,
-            },
-            { status: 500 },
-          )
-        }
-      }
-
       // Parse Discord roles from the string format ["ROLE1","ROLE2"]
       let discordRoles: string[] = []
 

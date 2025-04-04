@@ -182,8 +182,8 @@ export default function Home() {
 
         if (data.roleAssigned) {
           setSuccessWithTimeout("Wallet linked with Discord and roles assigned successfully!")
-        } else if (data.success) {
-          setSuccessWithTimeout("Wallet linked with Discord successfully!")
+        } else {
+          setErrorWithTimeout(data.roleMessage)
         }
 
         return true
