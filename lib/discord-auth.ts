@@ -15,8 +15,6 @@ export const generateState = () => {
 export const storeState = (state: string) => {
   if (typeof window !== "undefined") {
     localStorage.setItem("discord_oauth_state", state)
-    // Store the current URL to redirect back after auth
-    localStorage.setItem("discord_auth_redirect", window.location.href)
   }
 }
 
@@ -29,19 +27,10 @@ export const verifyState = (state: string) => {
   return false
 }
 
-// Get the redirect URL after auth
-export const getRedirectUrl = () => {
-  if (typeof window !== "undefined") {
-    return localStorage.getItem("discord_auth_redirect") || "/"
-  }
-  return "/"
-}
-
 // Clear state from localStorage
 export const clearState = () => {
   if (typeof window !== "undefined") {
     localStorage.removeItem("discord_oauth_state")
-    localStorage.removeItem("discord_auth_redirect")
   }
 }
 
@@ -64,6 +53,40 @@ export const getWalletAddress = () => {
 export const clearWalletAddress = () => {
   if (typeof window !== "undefined") {
     localStorage.removeItem("wallet_address")
+  }
+}
+
+// Store Discord credentials
+export const storeDiscordCredentials = (id: string, username: string | null) => {
+  if (typeof window !== "undefined") {
+    const credentials = {
+      id,
+      username: username || "",
+      timestamp: Date.now(),
+    }
+    localStorage.setItem("discord_credentials", JSON.stringify(credentials))
+  }
+}
+
+// Get stored Discord credentials
+export const getDiscordCredentials = () => {
+  if (typeof window !== "undefined") {
+    const credentialsStr = localStorage.getItem("discord_credentials")
+    if (credentialsStr) {
+      try {
+        return JSON.parse(credentialsStr)
+      } catch (e) {
+        console.error("Error parsing Discord credentials:", e)
+      }
+    }
+  }
+  return null
+}
+
+// Clear Discord credentials
+export const clearDiscordCredentials = () => {
+  if (typeof window !== "undefined") {
+    localStorage.setItem("discord_credentials", "")
   }
 }
 

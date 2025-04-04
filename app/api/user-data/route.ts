@@ -18,7 +18,7 @@ if (!discordBotToken) {
 
 export async function POST(request: Request) {
   try {
-    const { address } = await request.json()
+    const { address, discordId } = await request.json()
 
     if (!address) {
       return NextResponse.json({ error: "Wallet address is required" }, { status: 400 })
@@ -35,7 +35,7 @@ export async function POST(request: Request) {
           mintAmountsGTD: 2,
           mintAmountsFCFS: 1,
           dcRoles: ["FOGCHAN", "FLASHCHAN"],
-          dcId: "123456789012345678", // Mock Discord ID
+          dcId: discordId || "123456789012345678", // Use provided Discord ID or mock one
           roleAssigned: false,
           message: "TEST MODE: Discord roles not assigned in test mode",
           eligible: true,
@@ -60,7 +60,7 @@ export async function POST(request: Request) {
     try {
       // Query the database for the wallet address
       const { data, error } = await supabase
-        .from("wallets") // Replace with your actual table name
+        .from("master_hype_evm_wallet_mint_details") // Replace with your actual table name
         .select("address, allowedMintsGTD, allowedMintsFCFS, dcRole, dcId")
         .eq("address", address.toLowerCase())
 
@@ -93,20 +93,16 @@ export async function POST(request: Request) {
 
       // Parse Discord roles from the string format ["ROLE1","ROLE2"]
       let discordRoles: string[] = []
-      try {
-        if (walletData.dcRole) {
-          // Handle the format in the database which appears to be a string like ["FOGCHAN","FLASHCHAN"]
-          discordRoles = JSON.parse(walletData.dcRole.replace(/'/g, '"'))
-        }
-      } catch (e) {
-        console.error("Error parsing Discord roles:", e)
-        // If parsing fails, try to extract roles using regex
-        const roleMatches = walletData.dcRole?.match(/"([^"]+)"/g) || []
-        discordRoles = roleMatches.map((match: string) => match.replace(/"/g, ""))
-      }
+
+      // If parsing fails, try to extract roles using regex
+      const roleMatches = walletData.dcRole?.match(/"([^"]+)"/g) || []
+      discordRoles = roleMatches.map((match: string) => match.replace(/"/g, ""))
 
       // Check if eligible (has any mints allocated)
       const isEligible = walletData.allowedMintsGTD > 0 || walletData.allowedMintsFCFS > 0
+
+      // Check if the wallet is linked with the provided Discord ID
+      const isLinked = discordId && walletData.dcId === discordId
 
       // Prepare response data
       const responseData = {
@@ -118,6 +114,7 @@ export async function POST(request: Request) {
         roleAssigned: false,
         message: "",
         eligible: isEligible,
+        isLinked: isLinked,
       }
 
       // Assign Discord roles if Discord ID is available

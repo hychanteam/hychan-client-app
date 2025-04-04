@@ -36,8 +36,8 @@ export async function POST(request: Request) {
     try {
       // First, check if the wallet exists in the database
       const { data: walletData, error: walletError } = await supabase
-        .from("wallets")
-        .select("address, allowedMintsGTD, allowedMintsFCFS, dcRole")
+        .from("master_hype_evm_wallet_mint_details")
+        .select("address, allowedMintsGTD, allowedMintsFCFS, dcRole, dcId")
         .eq("address", walletAddress.toLowerCase())
 
       if (walletError) {
@@ -63,35 +63,73 @@ export async function POST(request: Request) {
         )
       }
 
-      // Update the wallet with the Discord ID
-      const { error: updateError } = await supabase
-        .from("wallets")
-        .update({ dcId: discordId })
-        .eq("address", walletAddress.toLowerCase())
-
-      if (updateError) {
-        console.error("Error updating wallet with Discord ID:", updateError)
+      // Check if wallet is already linked to a different Discord ID
+      if (walletData[0].dcId && walletData[0].dcId !== discordId) {
         return NextResponse.json(
           {
-            error: `Failed to link wallet with Discord ID: ${updateError.message}`,
+            error: "This wallet is already linked to a different Discord account",
+            walletAddress,
+            success: false,
+          },
+          { status: 409 }, // Conflict status code
+        )
+      }
+
+      // Check if this Discord ID is already linked to a different wallet
+      const { data: existingLinks, error: existingLinksError } = await supabase
+        .from("master_hype_evm_wallet_mint_details")
+        .select("address")
+        .eq("dcId", discordId)
+        .neq("address", walletAddress.toLowerCase())
+
+      if (existingLinksError) {
+        console.error("Error checking existing links:", existingLinksError)
+        return NextResponse.json(
+          {
+            error: `Database query error: ${existingLinksError.message}`,
           },
           { status: 500 },
         )
       }
 
+      if (existingLinks && existingLinks.length > 0) {
+        return NextResponse.json(
+          {
+            error: "This Discord account is already linked to a different wallet",
+            discordId,
+            success: false,
+          },
+          { status: 409 }, // Conflict status code
+        )
+      }
+
+      // If the wallet already has the same Discord ID, no need to update
+      if (walletData[0].dcId === discordId) {
+        console.log("Wallet already linked to this Discord ID, skipping update")
+      } else {
+        // Update the wallet with the Discord ID
+        const { error: updateError } = await supabase
+          .from("master_hype_evm_wallet_mint_details")
+          .update({ dcId: discordId })
+          .eq("address", walletAddress.toLowerCase())
+
+        if (updateError) {
+          console.error("Error updating wallet with Discord ID:", updateError)
+          return NextResponse.json(
+            {
+              error: `Failed to link wallet with Discord ID: ${updateError.message}`,
+            },
+            { status: 500 },
+          )
+        }
+      }
+
       // Parse Discord roles from the string format ["ROLE1","ROLE2"]
       let discordRoles: string[] = []
-      try {
-        if (walletData[0].dcRole) {
-          // Handle the format in the database which appears to be a string like ["FOGCHAN","FLASHCHAN"]
-          discordRoles = JSON.parse(walletData[0].dcRole.replace(/'/g, '"'))
-        }
-      } catch (e) {
-        console.error("Error parsing Discord roles:", e)
-        // If parsing fails, try to extract roles using regex
-        const roleMatches = walletData[0].dcRole?.match(/"([^"]+)"/g) || []
-        discordRoles = roleMatches.map((match: string) => match.replace(/"/g, ""))
-      }
+
+      // If parsing fails, try to extract roles using regex
+      const roleMatches = walletData[0].dcRole?.match(/"([^"]+)"/g) || []
+      discordRoles = roleMatches.map((match: string) => match.replace(/"/g, ""))
 
       // Assign Discord roles if Discord ID is available and bot token exists
       let roleAssigned = false
@@ -101,8 +139,9 @@ export async function POST(request: Request) {
         try {
           // Map role names to Discord role IDs (you would need to maintain this mapping)
           const roleMapping: Record<string, string> = {
-            FOGCHAN: "123456789012345678", // Replace with actual Discord role IDs
-            FLASHCHAN: "123456789012345679",
+            MINTCHAN: "1351040396104302603", // Replace with actual Discord role IDs
+            OGCHAN: "1351040640070320158",
+            FLASHCHAN: "1353017517966098534",
             // Add more role mappings as needed
           }
 
@@ -110,48 +149,77 @@ export async function POST(request: Request) {
           const roleIds = discordRoles.map((role) => roleMapping[role]).filter((id) => id !== undefined)
 
           if (roleIds.length > 0) {
-            // Assign roles using Discord API
             const assignmentResults = await Promise.all(
               roleIds.map(async (roleId) => {
+                const url = `https://discord.com/api/v10/guilds/${discordServerId}/members/${discordId}/roles/${roleId}`
                 try {
-                  const response = await fetch(
-                    `https://discord.com/api/v10/guilds/${discordServerId}/members/${discordId}/roles/${roleId}`,
-                    {
-                      method: "PUT",
-                      headers: {
-                        Authorization: `Bot ${discordBotToken}`,
-                        "Content-Type": "application/json",
-                      },
+                  const response = await fetch(url, {
+                    method: "PUT",
+                    headers: {
+                      Authorization: `Bot ${discordBotToken}`,
+                      "Content-Type": "application/json",
                     },
-                  )
-
+                  })
+      
+                  const responseText = await response.text()
+                  const logMessage = response.ok
+                    ? `Role ${roleId} assigned successfully.`
+                    : `Failed to assign role ${roleId}. Status: ${response.status}. Response: ${responseText}`
+      
+                  console.log(logMessage)
+      
                   return {
                     roleId,
                     success: response.ok,
                     status: response.status,
+                    message: responseText,
                   }
                 } catch (error) {
                   console.error(`Error assigning role ${roleId}:`, error)
                   return {
                     roleId,
                     success: false,
+                    status: 0,
                     error: error instanceof Error ? error.message : "Unknown error",
                   }
                 }
-              }),
+              })
             )
-
+      
             roleAssigned = assignmentResults.every((result) => result.success)
             roleMessage = roleAssigned
-              ? "Discord roles assigned successfully"
-              : "Some Discord roles could not be assigned"
+              ? "All Discord roles assigned successfully."
+              : `Some roles failed to assign:\n${assignmentResults
+                  .filter((r) => !r.success)
+                  .map((r) => `- Role ${r.roleId}: ${r.status} ${r.error || r.message || "Unknown error"}`)
+                  .join("\n")}`
+
+            if(roleAssigned){
+              // Update the wallet with the Discord ID
+                const { error: updateError } = await supabase
+                .from("master_hype_evm_wallet_mint_details")
+                .update({ dcId: discordId })
+                .eq("address", walletAddress.toLowerCase())
+
+              if (updateError) {
+                console.error("Error updating wallet with Discord ID:", updateError)
+                return NextResponse.json(
+                  {
+                    error: `Failed to link wallet with Discord ID: ${updateError.message}`,
+                  },
+                  { status: 500 },
+                )
+              }
+            }
+          } else {
+            roleMessage = "No valid Discord role IDs found to assign."
           }
-        } catch (error) {
-          console.error("Error in Discord role assignment:", error)
-          roleMessage = "Error assigning Discord roles"
+        } catch (e) {
+          console.error("Unexpected error during role assignment:", e)
+          roleMessage = "Unexpected error occurred during Discord role assignment."
         }
-      } else if (!discordBotToken) {
-        roleMessage = "Discord bot token not configured"
+      } else {
+        roleMessage = "Missing roles, bot token, or Discord user/server ID."
       }
 
       return NextResponse.json({

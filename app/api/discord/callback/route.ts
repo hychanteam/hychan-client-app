@@ -7,9 +7,6 @@ const DISCORD_REDIRECT_URI = process.env.NEXT_PUBLIC_BASE_URL
   ? `${process.env.NEXT_PUBLIC_BASE_URL}/api/discord/callback`
   : ""
 
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
-const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY
-
 export async function GET(request: Request) {
   // Get the code and state from the URL
   const url = new URL(request.url)
