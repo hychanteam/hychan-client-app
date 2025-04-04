@@ -105,4 +105,3 @@ export const getDiscordAuthUrl = () => {
 
   return `https://discord.com/api/oauth2/authorize?${params.toString()}`
 }
-
