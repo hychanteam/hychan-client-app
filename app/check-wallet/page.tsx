@@ -15,7 +15,7 @@ import {
   getDiscordCredentials,
   clearDiscordCredentials,
   getDiscordAuthUrl,
-} from "../../lib/discord-auth"
+} from "../../lib/auth"
 import { FaDiscord } from "react-icons/fa"
 
 type EligibilityResult = {
