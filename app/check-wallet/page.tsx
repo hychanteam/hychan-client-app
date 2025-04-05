@@ -261,7 +261,6 @@ export default function CheckWallet() {
       }
 
       const userData = await userDataResponse.json()
-      console.log("User data:", userData)
 
       // Then check eligibility
       const response = await fetch("/api/check-wallet", {
@@ -549,7 +548,7 @@ export default function CheckWallet() {
                       {checkResult.message} Join our Discord community to learn how you can get on the allowlist!
                     </p>
                     <Link
-                      href="https://discord.gg/hychan"
+                      href="https://discord.gg/hychanhl"
                       target="_blank"
                       rel="noopener noreferrer"
                       className="inline-block mt-2 bg-teal-800/70 hover:bg-teal-700 text-white py-2 px-4 rounded-md transition-colors"
