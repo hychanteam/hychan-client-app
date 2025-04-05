@@ -456,6 +456,7 @@ export default function Home() {
 
       <div className="container mx-auto px-4 py-6 flex-1 flex flex-col relative z-10">
         <header className="flex justify-center md:justify-between items-center h-12">
+          <div className="w-32 md:w-40"/>
           
           {/* Navbar buttons - hidden on mobile */}
           <div className="hidden md:flex gap-2">
