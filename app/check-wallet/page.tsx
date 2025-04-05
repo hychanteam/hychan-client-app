@@ -1,12 +1,22 @@
 "use client"
 
 import type React from "react"
-import { useState } from "react"
+import { useEffect, useRef, useState } from "react"
 import Link from "next/link"
 import Image from "next/image"
-import { ArrowLeft, Check, XIcon, Loader2 } from "lucide-react"
+import { ArrowLeft, Check, XIcon, Loader2, X } from "lucide-react"
 import Confetti from "react-confetti"
 import { useWindowSize } from "react-use"
+import { ethers } from "ethers"
+import { 
+  storeWalletAddress,
+  getWalletAddress,
+  clearWalletAddress,
+  getDiscordCredentials,
+  clearDiscordCredentials,
+  getDiscordAuthUrl,
+} from "../../lib/discord-auth"
+import { FaDiscord } from "react-icons/fa"
 
 type EligibilityResult = {
   eligible: boolean
@@ -23,21 +33,237 @@ export default function CheckWallet() {
   const [isChecking, setIsChecking] = useState(false)
   const [checkResult, setCheckResult] = useState<EligibilityResult | null>(null)
   const [error, setError] = useState("")
-  const [showConfetti, setShowConfetti] = useState(false)
+  const [showSuccessConfetti, setShowSuccessConfetti] = useState(false)
   const { width, height } = useWindowSize()
+
+  // Wallet connection state
+  const [connectedWalletAddress, setConnectedWalletAddress] = useState<string>("")
+  const [isConnected, setIsConnected] = useState<boolean>(false)
+  const [isConnecting, setIsConnecting] = useState<boolean>(false)
+  const [hasAutoChecked, setHasAutoChecked] = useState<boolean>(false)
+
+  // Discord state
+  const [discordId, setDiscordId] = useState<string | null>(null)
+  const [discordUsername, setDiscordUsername] = useState<string | null>(null)
+
+  // Ref to track pending wallet connection requests
+  const pendingWalletRequestRef = useRef<boolean>(false)
 
   // Function to validate EVM address format
   const isValidEVMAddress = (address: string) => {
     return /^0x[a-fA-F0-9]{40}$/.test(address)
   }
 
+  // Connect wallet function
+  const connectWallet = async (silent = false) => {
+    // If there's already a pending request, don't start another one
+    if (pendingWalletRequestRef.current) {
+      return false
+    }
+
+    if (!silent) setIsConnecting(true)
+    setError("")
+
+    // Set the pending flag
+    pendingWalletRequestRef.current = true
+
+    try {
+      if (window.ethereum) {
+        const provider = new ethers.BrowserProvider(window.ethereum)
+
+        // Use eth_requestAccounts to prompt the wallet if not silent
+        // Use eth_accounts to check without prompting if silent
+        const method = silent ? "eth_accounts" : "eth_requestAccounts"
+        const accounts = await provider.send(method, [])
+
+        if (accounts.length > 0) {
+          const address = accounts[0]
+          setConnectedWalletAddress(address)
+          setIsConnected(true)
+
+          // Update the input field with the connected wallet address
+          setWalletAddress(address)
+
+          // Store wallet address in localStorage for persistence
+          storeWalletAddress(address)
+
+          // If this is the first connection, auto-check the wallet
+          if (!hasAutoChecked) {
+            checkEligibility(address)
+            setHasAutoChecked(true)
+          }
+
+          return true // Successfully connected
+        } else if (!silent) {
+          // Only show this error if not in silent mode
+          setError("No accounts found. Please unlock your wallet and try again.")
+        }
+      } else if (!silent) {
+        // Only show this error if not in silent mode
+        setError("No Ethereum wallet detected. Please install MetaMask.")
+      }
+      return false // Failed to connect
+    } catch (err: any) {
+      console.error("Error connecting wallet:", err)
+
+      // Don't show the "already pending" error to the user
+      const isPendingError = err.code === -32002 || (err.message && err.message.includes("already pending"))
+
+      if (!silent && !isPendingError) {
+        setError("Failed to connect wallet. Please try again.")
+      }
+      return false
+    } finally {
+      if (!silent) setIsConnecting(false)
+
+      // Clear the pending flag
+      pendingWalletRequestRef.current = false
+    }
+  }
+
+  // Disconnect wallet function
+  const disconnectWallet = () => {
+    setConnectedWalletAddress("")
+    setIsConnected(false)
+    setHasAutoChecked(false)
+
+    // Don't clear the wallet address from the input field
+    // This allows the user to still check the wallet they were looking at
+
+    // Clear stored wallet address
+    clearWalletAddress()
+  }
+
+  // Connect Discord function
+  const connectDiscord = () => {
+    // Make sure we store the current wallet address before redirecting
+    if (connectedWalletAddress) {
+      storeWalletAddress(connectedWalletAddress)
+    }
+
+    window.location.href = getDiscordAuthUrl()
+  }
+
+  // Disconnect Discord function
+  const disconnectDiscord = () => {
+    setDiscordId(null)
+    setDiscordUsername(null)
+
+    // Clear Discord cookies
+    document.cookie = "discord_user_id=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;"
+    document.cookie = "discord_username=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;"
+
+    // Clear Discord credentials from localStorage
+    clearDiscordCredentials()
+  }
+
+  // Check for stored Discord credentials on mount
+  useEffect(() => {
+    const checkDiscordCredentials = () => {
+      const credentials = getDiscordCredentials()
+      if (credentials && credentials.id) {
+        setDiscordId(credentials.id)
+        setDiscordUsername(credentials.username || null)
+      }
+    }
+
+    checkDiscordCredentials()
+  }, [])
+
+  // Auto-connect wallet on page load
+  useEffect(() => {
+    const autoConnectWallet = async () => {
+      // Check if we have a stored wallet address first
+      const storedAddress = getWalletAddress()
+
+      if (storedAddress) {
+        // If we have a stored address, set it
+        setConnectedWalletAddress(storedAddress)
+        setIsConnected(true)
+
+        // Update the input field with the connected wallet address
+        setWalletAddress(storedAddress)
+
+        // Auto-check the wallet
+        await checkEligibility(storedAddress)
+        setHasAutoChecked(true)
+      } else {
+        // Otherwise try silent connection (no popup)
+        const connected = await connectWallet(true)
+
+        if (connected && !hasAutoChecked) {
+          // Auto-check the wallet if connected
+          await checkEligibility(connectedWalletAddress)
+          setHasAutoChecked(true)
+        }
+      }
+    }
+
+    if (!isConnected) {
+      autoConnectWallet()
+    }
+  }, [])
+
+  // Listen for account changes
+  useEffect(() => {
+    if (window.ethereum) {
+      const handleAccountsChanged = (accounts: string[]) => {
+        if (accounts.length > 0) {
+          const newAddress = accounts[0]
+          setConnectedWalletAddress(newAddress)
+          setIsConnected(true)
+
+          // Update the input field with the new connected wallet address
+          setWalletAddress(newAddress)
+
+          // Update stored wallet address
+          storeWalletAddress(newAddress)
+
+          // Auto-check the new wallet
+          checkEligibility(newAddress)
+        } else {
+          // User disconnected their wallet
+          setConnectedWalletAddress("")
+          setIsConnected(false)
+
+          // Clear stored wallet address
+          clearWalletAddress()
+        }
+      }
+
+      window.ethereum.on("accountsChanged", handleAccountsChanged)
+
+      return () => {
+        window.ethereum?.removeListener("accountsChanged", handleAccountsChanged)
+      }
+    }
+  }, [])
+
   // Function to check eligibility using the API
   const checkEligibility = async (address: string) => {
     setIsChecking(true)
     setError("")
     setCheckResult(null)
+    setShowSuccessConfetti(false)
 
     try {
+      // First, fetch user data
+      const userDataResponse = await fetch("/api/user-data", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ address }),
+      })
+
+      if (!userDataResponse.ok) {
+        throw new Error("Failed to fetch user data")
+      }
+
+      const userData = await userDataResponse.json()
+      console.log("User data:", userData)
+
+      // Then check eligibility
       const response = await fetch("/api/check-wallet", {
         method: "POST",
         headers: {
@@ -55,11 +281,18 @@ export default function CheckWallet() {
         throw new Error(errorMessage)
       }
 
+      // Add Discord role assignment message if applicable
+      if (userData.roleAssigned) {
+        result.message += " Discord roles have been assigned to your account."
+      } else if (userData.dcId && userData.dcRoles && userData.dcRoles.length > 0) {
+        result.message += " " + userData.message
+      }
+
       setCheckResult(result)
       if (result.eligible) {
-        setShowConfetti(true)
+        setShowSuccessConfetti(true)
         // Hide confetti after 5 seconds
-        setTimeout(() => setShowConfetti(false), 5000)
+        setTimeout(() => setShowSuccessConfetti(false), 5000)
       }
     } catch (err) {
       console.error("Error details:", err)
@@ -89,9 +322,14 @@ export default function CheckWallet() {
     checkEligibility(walletAddress)
   }
 
+  // Close error message
+  const closeError = () => {
+    setError("")
+  }
+
   return (
     <main className="min-h-screen bg-teal-800 text-white flex flex-col relative overflow-hidden">
-      {showConfetti && (
+      {showSuccessConfetti && (
         <Confetti
         width={width}
         height={height}
@@ -154,6 +392,7 @@ export default function CheckWallet() {
         friction={0.97}
       />
       )}
+
       {/* Background image with overlay */}
       <div className="absolute inset-0 z-0">
         <Image
@@ -172,6 +411,53 @@ export default function CheckWallet() {
             <ArrowLeft className="mr-2" size={20} />
             <span>Back to Home</span>
           </Link>
+
+          <div className="flex gap-2">
+            {/* Wallet Connect Button */}
+            {isConnected ? (
+              <button
+                onClick={disconnectWallet}
+                className="bg-transparent border border-white/30 text-white py-2 px-4 rounded-[8px] hover:bg-white/10 transition-colors"
+              >
+                {connectedWalletAddress.substring(0, 6)}...
+                {connectedWalletAddress.substring(connectedWalletAddress.length - 4)}
+              </button>
+            ) : (
+              <button
+                onClick={() => connectWallet(false)}
+                disabled={isConnecting}
+                className="bg-transparent border border-white/30 text-white py-2 px-4 rounded-md font-medium transition-colors disabled:opacity-70 disabled:cursor-not-allowed flex items-center"
+              >
+                {isConnecting ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    Connecting...
+                  </>
+                ) : (
+                  "Connect Wallet"
+                )}
+              </button>
+            )}
+
+            {/* Discord Connect Button */}
+            {discordId ? (
+              <button
+                onClick={disconnectDiscord}
+                className="bg-indigo-600 hover:bg-indigo-700 text-white py-2 px-4 rounded-md transition-colors flex items-center"
+              >
+                <FaDiscord size={24} className="mr-2" />
+                {discordUsername || "Discord"}
+              </button>
+            ) : (
+              <button
+                onClick={connectDiscord}
+                className="bg-indigo-600 hover:bg-indigo-700 text-white py-2 px-4 rounded-md transition-colors flex items-center"
+              >
+                <FaDiscord size={24} className="mr-2" />
+                Connect
+              </button>
+            )}
+          </div>
         </header>
 
         <div className="flex-1 flex flex-col items-center justify-center text-center relative mt-4">
@@ -188,10 +474,26 @@ export default function CheckWallet() {
           <h1 className="text-3xl md:text-4xl font-bold mb-8 mt-6">Wallet Checker</h1>
 
           <div className="w-full max-w-md bg-teal-900/60 backdrop-blur-sm p-6 rounded-lg border border-white/10">
+            {/* Error message */}
+            {error && (
+              <div className="mb-4 p-3 bg-red-900/40 border border-red-500/30 rounded-md flex items-start relative">
+                <XIcon className="text-red-400 mr-2 flex-shrink-0 mt-0.5" size={16} />
+                <p className="text-sm text-left pr-6">{error}</p>
+                <button
+                  onClick={closeError}
+                  className="absolute top-2 right-2 text-white/70 hover:text-white"
+                  aria-label="Close error message"
+                >
+                  <X size={16} />
+                </button>
+              </div>
+            )}
+
+            {/* Wallet check form */}
             <form onSubmit={handleSubmit} className="space-y-6">
               <div className="space-y-2">
                 <label htmlFor="wallet-address" className="block text-left text-sm font-medium">
-                  EVM Wallet Address
+                  {isConnected ? "Connected Wallet (edit to check any wallet)" : "Enter Wallet Address"}
                 </label>
                 <input
                   id="wallet-address"
@@ -199,11 +501,22 @@ export default function CheckWallet() {
                   value={walletAddress}
                   onChange={(e) => setWalletAddress(e.target.value)}
                   placeholder="0x..."
-                  className="w-full px-4 py-3 bg-teal-800/80 border border-white/20 rounded-md focus:outline-none focus:ring-2 focus:ring-teal-400"
+                  className={`w-full px-4 py-3 bg-teal-800/80 border rounded-md focus:outline-none focus:ring-2 focus:ring-teal-400 ${
+                    isConnected && walletAddress === connectedWalletAddress ? "border-teal-400/50" : "border-white/20"
+                  }`}
                 />
+                {isConnected && walletAddress !== connectedWalletAddress && (
+                  <div className="flex justify-end">
+                    <button
+                      type="button"
+                      onClick={() => setWalletAddress(connectedWalletAddress)}
+                      className="text-xs text-teal-300 hover:text-teal-200"
+                    >
+                      Reset to connected wallet
+                    </button>
+                  </div>
+                )}
               </div>
-
-              {error && <div className="text-red-300 text-sm text-left">{error}</div>}
 
               <button
                 type="submit"
@@ -221,19 +534,39 @@ export default function CheckWallet() {
               </button>
             </form>
 
+            {/* Check result */}
             {checkResult && (
               <div
                 className={`mt-8 p-4 rounded-md ${checkResult.eligible ? "bg-green-900/40 border border-green-500/30" : "bg-red-900/40 border border-red-500/30"}`}
               >
-                <div className="flex items-center justify-center mb-2">
-                  {checkResult.eligible ? (
-                    <Check className="text-green-400 mr-2" size={24} />
-                  ) : (
-                    <XIcon className="text-red-400 mr-2" size={24} />
-                  )}
-                  <h3 className="text-xl font-bold">{checkResult.eligible ? "Eligible" : "Not Eligible"}</h3>
-                </div>
-                <p className="mb-4">{checkResult.message}</p>
+                {!checkResult.eligible ? (
+                  <>
+                    <div className="flex items-center justify-center mb-2">
+                      <XIcon className="text-red-400 mr-2" size={24} />
+                      <h3 className="text-xl font-bold">Not Eligible Yet</h3>
+                    </div>
+                    <p className="mb-4">
+                      {checkResult.message} Join our Discord community to learn how you can get on the allowlist!
+                    </p>
+                    <Link
+                      href="https://discord.gg/hychan"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="inline-block mt-2 bg-teal-800/70 hover:bg-teal-700 text-white py-2 px-4 rounded-md transition-colors"
+                    >
+                      <FaDiscord className="inline-block mr-2" size={24} />
+                      Join  
+                    </Link>
+                  </>
+                ) : (
+                  <>
+                    <div className="flex items-center justify-center mb-2">
+                      <Check className="text-green-400 mr-2" size={24} />
+                      <h3 className="text-xl font-bold">Eligible</h3>
+                    </div>
+                    <p className="mb-4">{checkResult.message}</p>
+                  </>
+                )}
 
                 {checkResult.eligible && checkResult.data && (
                   <div className="mt-4 space-y-4 text-left">
@@ -267,7 +600,7 @@ export default function CheckWallet() {
                 )}
 
                 {checkResult.eligible && (
-                  <Link href="#" className="block mt-6">
+                  <Link href="/mint" className="block mt-6">
                     <button className="bg-teal-400 hover:bg-teal-300 text-teal-900 py-2 px-6 rounded-md font-medium transition-colors w-full">
                       Mint coming soon
                     </button>
