@@ -1,99 +1,47 @@
 import { ethers } from "ethers"
-import MerkleTree from "merkletreejs"
 import keccak256 from "keccak256"
+import { MerkleTree } from "merkletreejs"
 
-// ABI for the ERC721ATokenMerkle contract (partial - just what we need)
-export const CONTRACT_ABI = [
-  "function safeMint(uint256 _mintAmount, uint256 _allowedMints, uint256 _categoryIndex, bytes32[] calldata _merkleProof) external payable",
-  "function degenSafeMint(uint256 _mintAmount) external payable",
-  "function phaseIndex() public view returns (int256)",
-  "function mintPhases(uint256) public view returns (uint256 startTime, uint256 endTime, uint256 phaseTimeLength)",
-  "function categoryMintedCount(uint256, uint256) public view returns (uint256)",
-  "function addressMintedBalance(uint256, uint256, address) public view returns (uint256)",
-  "function maxSupply() public view returns (uint256)",
-  "function totalSupply() public view returns (uint256)",
-  "function degenCost() public view returns (uint256)",
-  "function degenMintedCount(address) public view returns (uint256)",
-  "function maxDegenMintPerWallet() public view returns (uint256)",
-  "function mintPhases(uint256) public view returns (uint256 startTime, uint256 endTime, uint256 phaseTimeLength, tuple(uint256 price, bytes32 merkleRoot, uint256 maxMintPerWallet, uint256 defaultMintableSupply, uint256 mintableSupply)[] categories)",
-]
+const CONTRACT_ADDRESS = "0xYourContractAddressHere" // Replace with actual contract address
 
-// Contract address - replace with your deployed contract address
-export const CONTRACT_ADDRESS = "0x0000000000000000000000000000000000000000" // Replace with actual address
-
-// Phase names for display
-export const PHASE_NAMES = ["GTD Mint", "FCFS Mint", "Public Mint"]
-
-// Function to generate a Merkle proof
-export const generateMerkleProof = (
-  address: string,
-  allowedMints: number,
-  whitelistData: Array<{ address: string; allowedMints: number }>,
-) => {
-  // Create leaf nodes
-  const leaves = whitelistData.map((entry) =>
-    keccak256(ethers.solidityPacked(["address", "uint256"], [entry.address, entry.allowedMints])),
-  )
-
-  // Create Merkle Tree
-  const tree = new MerkleTree(leaves, keccak256, { sortPairs: true })
-
-  // Create leaf for the user
-  const leaf = keccak256(ethers.solidityPacked(["address", "uint256"], [address, allowedMints]))
-
-  // Generate proof
-  return tree.getHexProof(leaf)
-}
-
-// Function to get contract instance
+// Function to get the contract instance
 export const getContract = async (provider: any) => {
-  try {
-    const signer = provider.getSigner()
-    return new ethers.Contract(CONTRACT_ADDRESS, CONTRACT_ABI, signer)
-  } catch (error) {
-    console.error("Error getting contract:", error)
-    throw error
-  }
+  const signer = await provider.getSigner()
+  const contract = new ethers.Contract(CONTRACT_ADDRESS, contractABI, signer)
+  return contract
 }
 
 // Function to get current phase info
 export const getCurrentPhaseInfo = async (contract: ethers.Contract) => {
   try {
-    const phaseIndex = await contract.phaseIndex()
+    const phaseIndex = Number(await contract.currentPhase())
+    const phaseName = await contract.getPhaseName(phaseIndex)
+    const startTime = Number(await contract.getPhaseStartTime(phaseIndex))
+    const endTime = Number(await contract.getPhaseEndTime(phaseIndex))
+    const active = await contract.isPhaseActive(phaseIndex)
+    const categoriesCount = Number(await contract.categoriesCount())
 
-    // If phase is paused (-1), return null
-    if (phaseIndex.toString() === "-1") {
-      return {
-        phaseIndex: -1,
-        phaseName: "Minting Paused",
-        startTime: 0,
-        endTime: 0,
-        active: false,
-        categories: [],
-      }
+    const categories = []
+    for (let i = 0; i < categoriesCount; i++) {
+      const category = await contract.getCategory(i)
+      categories.push({
+        index: i,
+        name: category.name,
+        price: category.price,
+        maxMintPerWallet: Number(category.maxMintPerWallet),
+      })
     }
-
-    const phaseData = await contract.mintPhases(phaseIndex)
-    const currentTime = Math.floor(Date.now() / 1000)
-
-    // Extract categories from phaseData
-    const categories = phaseData.categories || []
 
     return {
-      phaseIndex: Number(phaseIndex),
-      phaseName: PHASE_NAMES[Number(phaseIndex)] || `Phase ${phaseIndex}`,
-      startTime: Number(phaseData.startTime),
-      endTime: Number(phaseData.endTime),
-      active: currentTime >= Number(phaseData.startTime) && currentTime <= Number(phaseData.endTime),
-      categories: categories.map((cat: any, index: number) => ({
-        index,
-        price: cat.price,
-        maxMintPerWallet: Number(cat.maxMintPerWallet),
-        mintableSupply: Number(cat.mintableSupply),
-      })),
+      phaseIndex,
+      phaseName,
+      startTime,
+      endTime,
+      active,
+      categories,
     }
   } catch (error) {
-    console.error("Error getting phase info:", error)
+    console.error("Error getting current phase info:", error)
     return {
       phaseIndex: -1,
       phaseName: "Error",
@@ -108,13 +56,14 @@ export const getCurrentPhaseInfo = async (contract: ethers.Contract) => {
 // Function to get supply info
 export const getSupplyInfo = async (contract: ethers.Contract) => {
   try {
-    const maxSupply = await contract.maxSupply()
-    const totalSupply = await contract.totalSupply()
+    const maxSupply = Number(await contract.maxSupply())
+    const totalSupply = Number(await contract.totalSupply())
+    const remainingSupply = maxSupply - totalSupply
 
     return {
-      maxSupply: Number(maxSupply),
-      totalSupply: Number(totalSupply),
-      remainingSupply: Number(maxSupply) - Number(totalSupply),
+      maxSupply,
+      totalSupply,
+      remainingSupply,
     }
   } catch (error) {
     console.error("Error getting supply info:", error)
@@ -126,62 +75,33 @@ export const getSupplyInfo = async (contract: ethers.Contract) => {
   }
 }
 
-// Function to get user mint info for a specific category
-export const getUserCategoryMintInfo = async (
-  contract: ethers.Contract,
-  address: string,
-  phaseIndex: number,
-  categoryIndex: number,
-) => {
+// Function to get user phase mints info
+export const getUserPhaseMintsInfo = async (contract: ethers.Contract, walletAddress: string, phaseIndex: number) => {
   try {
-    const mintedBalance = await contract.addressMintedBalance(phaseIndex, categoryIndex, address)
+    const categoriesCount = Number(await contract.categoriesCount())
+    const categories = []
 
-    // Get the phase data to find the max mint per wallet for this category
-    const phaseData = await contract.mintPhases(phaseIndex)
-    const categories = phaseData.categories || []
+    for (let i = 0; i < categoriesCount; i++) {
+      const maxMintPerWallet = Number(await contract.getMaxMintPerWalletForPhaseAndCategory(phaseIndex, i))
+      const mintedCount = Number(await contract.numberMinted(walletAddress, i))
+      const remainingMints = maxMintPerWallet - mintedCount
 
-    let maxMintPerWallet = 1 // Default
-
-    if (categories.length > categoryIndex) {
-      maxMintPerWallet = Number(categories[categoryIndex].maxMintPerWallet)
+      categories.push({
+        index: i,
+        maxMintPerWallet,
+        mintedCount,
+        remainingMints,
+      })
     }
 
-    return {
-      mintedCount: Number(mintedBalance),
-      maxMintPerWallet: maxMintPerWallet,
-      remainingMints: maxMintPerWallet - Number(mintedBalance),
-    }
-  } catch (error) {
-    console.error(`Error getting user mint info for phase ${phaseIndex}, category ${categoryIndex}:`, error)
-    return {
-      mintedCount: 0,
-      maxMintPerWallet: 0,
-      remainingMints: 0,
-    }
-  }
-}
-
-// Function to get user mint info for all categories in a phase
-export const getUserPhaseMintsInfo = async (contract: ethers.Contract, address: string, phaseIndex: number) => {
-  try {
-    // Get the phase data to find all categories
-    const phaseData = await contract.mintPhases(phaseIndex)
-    const categories = phaseData.categories || []
-
-    // Get mint info for each category
-    const categoryInfos = await Promise.all(
-      Array.from({ length: categories.length }, (_, i) => getUserCategoryMintInfo(contract, address, phaseIndex, i)),
-    )
-
-    // Check if user has minted their full allocation for all categories
-    const hasFullyMinted = categoryInfos.every((info) => info.remainingMints === 0 && info.maxMintPerWallet > 0)
+    const hasFullyMinted = categories.every((category) => category.remainingMints <= 0)
 
     return {
-      categories: categoryInfos,
+      categories,
       hasFullyMinted,
     }
   } catch (error) {
-    console.error(`Error getting user phase mints info for phase ${phaseIndex}:`, error)
+    console.error("Error getting user phase mints info:", error)
     return {
       categories: [],
       hasFullyMinted: false,
@@ -190,17 +110,18 @@ export const getUserPhaseMintsInfo = async (contract: ethers.Contract, address: 
 }
 
 // Function to get degen mint info
-export const getDegenMintInfo = async (contract: ethers.Contract, address: string) => {
+export const getDegenMintInfo = async (contract: ethers.Contract, walletAddress: string) => {
   try {
-    const degenMintedCount = await contract.degenMintedCount(address)
-    const maxDegenMintPerWallet = await contract.maxDegenMintPerWallet()
-    const degenCost = await contract.degenCost()
+    const mintedCount = Number(await contract.degenMinted(walletAddress))
+    const maxMintPerWallet = 1 // Degen mint is limited to 1 per wallet
+    const remainingMints = maxMintPerWallet - mintedCount
+    const price = await contract.degenMintPrice()
 
     return {
-      mintedCount: Number(degenMintedCount),
-      maxMintPerWallet: Number(maxDegenMintPerWallet),
-      remainingMints: Number(maxDegenMintPerWallet) - Number(degenMintedCount),
-      price: degenCost,
+      mintedCount,
+      maxMintPerWallet,
+      remainingMints,
+      price,
     }
   } catch (error) {
     console.error("Error getting degen mint info:", error)
@@ -213,28 +134,618 @@ export const getDegenMintInfo = async (contract: ethers.Contract, address: strin
   }
 }
 
-// Function to format time remaining
-export const formatTimeRemaining = (endTime: number) => {
-  const now = Math.floor(Date.now() / 1000)
-  const timeRemaining = endTime - now
-
-  if (timeRemaining <= 0) return "Ended"
-
-  const hours = Math.floor(timeRemaining / 3600)
-  const minutes = Math.floor((timeRemaining % 3600) / 60)
-  const seconds = timeRemaining % 60
-
-  return `${hours}h ${minutes}m ${seconds}s`
+// Function to generate Merkle Proof
+export const generateMerkleProof = (address: string, allowedMints: number, whitelist: string[]) => {
+  const leafNodes = whitelist.map((addr) => keccak256(addr))
+  const merkleTree = new MerkleTree(leafNodes, keccak256, { sortPairs: true })
+  const proof = merkleTree.getHexProof(keccak256(address))
+  return proof
 }
 
-// Mock whitelist data for testing - replace with actual data in production
+// Mock Whitelists (Replace with actual data)
 export const mockGTDWhitelist = [
-  { address: "0x1234567890123456789012345678901234567890", allowedMints: 2 },
-  // Add more addresses as needed
+  "0xf39Fd6e51aad88F6F4ce6aB8829539bad25F8901",
+  "0x70997970C51812dc3A010C7d01b50e0d17dc79C8",
+  "0x3C44CdDdB6a900fa2b585dd299e03d12FA4293BC",
 ]
 
 export const mockFCFSWhitelist = [
-  { address: "0x1234567890123456789012345678901234567890", allowedMints: 1 },
-  // Add more addresses as needed
+  "0x90F79bf6EB2c4f870365E785982E1ca93e6a4398",
+  "0x15d34AAf54267DB7D7c367839AAf71A00a2C6A65",
+  "0x9965507D1a55bcC2695C58ba16FB3763172Ea472",
+]
+
+const contractABI = [
+  {
+    inputs: [],
+    stateMutability: "nonpayable",
+    type: "constructor",
+  },
+  {
+    anonymous: false,
+    inputs: [
+      {
+        indexed: true,
+        internalType: "address",
+        name: "owner",
+        type: "address",
+      },
+      {
+        indexed: true,
+        internalType: "address",
+        name: "approved",
+        type: "address",
+      },
+      {
+        indexed: true,
+        internalType: "uint256",
+        name: "tokenId",
+        type: "uint256",
+      },
+    ],
+    name: "Approval",
+    type: "event",
+  },
+  {
+    anonymous: false,
+    inputs: [
+      {
+        indexed: true,
+        internalType: "address",
+        name: "owner",
+        type: "address",
+      },
+      {
+        indexed: true,
+        internalType: "address",
+        name: "operator",
+        type: "address",
+      },
+      {
+        indexed: false,
+        internalType: "bool",
+        name: "approved",
+        type: "bool",
+      },
+    ],
+    name: "ApprovalForAll",
+    type: "event",
+  },
+  {
+    inputs: [
+      {
+        internalType: "address",
+        name: "approved",
+        type: "address",
+      },
+      {
+        internalType: "uint256",
+        name: "tokenId",
+        type: "uint256",
+      },
+    ],
+    name: "approve",
+    outputs: [],
+    stateMutability: "nonpayable",
+    type: "function",
+  },
+  {
+    inputs: [
+      {
+        internalType: "address",
+        name: "owner",
+        type: "address",
+      },
+    ],
+    name: "balanceOf",
+    outputs: [
+      {
+        internalType: "uint256",
+        name: "",
+        type: "uint256",
+      },
+    ],
+    stateMutability: "view",
+    type: "function",
+  },
+  {
+    inputs: [],
+    name: "categoriesCount",
+    outputs: [
+      {
+        internalType: "uint256",
+        name: "",
+        type: "uint256",
+      },
+    ],
+    stateMutability: "view",
+    type: "function",
+  },
+  {
+    inputs: [],
+    name: "currentPhase",
+    outputs: [
+      {
+        internalType: "uint8",
+        name: "",
+        type: "uint8",
+      },
+    ],
+    stateMutability: "view",
+    type: "function",
+  },
+  {
+    inputs: [
+      {
+        internalType: "uint256",
+        name: "_mintAmount",
+        type: "uint256",
+      },
+    ],
+    name: "degenSafeMint",
+    outputs: [],
+    stateMutability: "payable",
+    type: "function",
+  },
+  {
+    inputs: [
+      {
+        internalType: "address",
+        name: "",
+        type: "address",
+      },
+    ],
+    name: "degenMinted",
+    outputs: [
+      {
+        internalType: "uint256",
+        name: "",
+        type: "uint256",
+      },
+    ],
+    stateMutability: "view",
+    type: "function",
+  },
+  {
+    inputs: [],
+    name: "degenMintPrice",
+    outputs: [
+      {
+        internalType: "uint256",
+        name: "",
+        type: "uint256",
+      },
+    ],
+    stateMutability: "view",
+    type: "function",
+  },
+  {
+    inputs: [
+      {
+        internalType: "uint256",
+        name: "categoryId",
+        type: "uint256",
+      },
+    ],
+    name: "getCategory",
+    outputs: [
+      {
+        components: [
+          {
+            internalType: "string",
+            name: "name",
+            type: "string",
+          },
+          {
+            internalType: "uint256",
+            name: "price",
+            type: "uint256",
+          },
+          {
+            internalType: "uint256",
+            name: "maxMintPerWallet",
+            type: "uint256",
+          },
+        ],
+        internalType: "struct HyChan.Category",
+        name: "",
+        type: "tuple",
+      },
+    ],
+    stateMutability: "view",
+    type: "function",
+  },
+  {
+    inputs: [
+      {
+        internalType: "uint8",
+        name: "_phase",
+        type: "uint8",
+      },
+    ],
+    name: "getPhaseEndTime",
+    outputs: [
+      {
+        internalType: "uint256",
+        name: "",
+        type: "uint256",
+      },
+    ],
+    stateMutability: "view",
+    type: "function",
+  },
+  {
+    inputs: [
+      {
+        internalType: "uint8",
+        name: "_phase",
+        type: "uint8",
+      },
+    ],
+    name: "getPhaseName",
+    outputs: [
+      {
+        internalType: "string",
+        name: "",
+        type: "string",
+      },
+    ],
+    stateMutability: "view",
+    type: "function",
+  },
+  {
+    inputs: [
+      {
+        internalType: "uint8",
+        name: "_phase",
+        type: "uint8",
+      },
+    ],
+    name: "getPhaseStartTime",
+    outputs: [
+      {
+        internalType: "uint256",
+        name: "",
+        type: "uint256",
+      },
+    ],
+    stateMutability: "view",
+    type: "function",
+  },
+  {
+    inputs: [
+      {
+        internalType: "uint8",
+        name: "_phase",
+        type: "uint8",
+      },
+      {
+        internalType: "uint256",
+        name: "categoryId",
+        type: "uint256",
+      },
+    ],
+    name: "getMaxMintPerWalletForPhaseAndCategory",
+    outputs: [
+      {
+        internalType: "uint256",
+        name: "",
+        type: "uint256",
+      },
+    ],
+    stateMutability: "view",
+    type: "function",
+  },
+  {
+    inputs: [
+      {
+        internalType: "address",
+        name: "owner",
+        type: "address",
+      },
+      {
+        internalType: "address",
+        name: "operator",
+        type: "address",
+      },
+    ],
+    name: "isApprovedForAll",
+    outputs: [
+      {
+        internalType: "bool",
+        name: "",
+        type: "bool",
+      },
+    ],
+    stateMutability: "view",
+    type: "function",
+  },
+  {
+    inputs: [
+      {
+        internalType: "uint8",
+        name: "_phase",
+        type: "uint8",
+      },
+    ],
+    name: "isPhaseActive",
+    outputs: [
+      {
+        internalType: "bool",
+        name: "",
+        type: "bool",
+      },
+    ],
+    stateMutability: "view",
+    type: "function",
+  },
+  {
+    inputs: [],
+    name: "maxSupply",
+    outputs: [
+      {
+        internalType: "uint256",
+        name: "",
+        type: "uint256",
+      },
+    ],
+    stateMutability: "view",
+    type: "function",
+  },
+  {
+    inputs: [
+      {
+        internalType: "address",
+        name: "",
+        type: "address",
+      },
+      {
+        internalType: "uint256",
+        name: "",
+        type: "uint256",
+      },
+    ],
+    name: "numberMinted",
+    outputs: [
+      {
+        internalType: "uint256",
+        name: "",
+        type: "uint256",
+      },
+    ],
+    stateMutability: "view",
+    type: "function",
+  },
+  {
+    anonymous: false,
+    inputs: [
+      {
+        indexed: true,
+        internalType: "address",
+        name: "previousOwner",
+        type: "address",
+      },
+      {
+        indexed: true,
+        internalType: "address",
+        name: "newOwner",
+        type: "address",
+      },
+    ],
+    name: "OwnershipTransferred",
+    type: "event",
+  },
+  {
+    inputs: [],
+    name: "owner",
+    outputs: [
+      {
+        internalType: "address",
+        name: "",
+        type: "address",
+      },
+    ],
+    stateMutability: "view",
+    type: "function",
+  },
+  {
+    inputs: [],
+    name: "renounceOwnership",
+    outputs: [],
+    stateMutability: "nonpayable",
+    type: "function",
+  },
+  {
+    inputs: [
+      {
+        internalType: "uint256",
+        name: "_mintAmount",
+        type: "uint256",
+      },
+      {
+        internalType: "uint256",
+        name: "_allowedMints",
+        type: "uint256",
+      },
+      {
+        internalType: "uint256",
+        name: "_categoryId",
+        type: "uint256",
+      },
+      {
+        internalType: "bytes32[]",
+        name: "_merkleProof",
+        type: "bytes32[]",
+      },
+    ],
+    name: "safeMint",
+    outputs: [],
+    stateMutability: "payable",
+    type: "function",
+  },
+  {
+    inputs: [
+      {
+        internalType: "address",
+        name: "from",
+        type: "address",
+      },
+      {
+        internalType: "address",
+        name: "to",
+        type: "address",
+      },
+      {
+        internalType: "uint256",
+        name: "tokenId",
+        type: "uint256",
+      },
+    ],
+    name: "safeTransfer",
+    outputs: [],
+    stateMutability: "nonpayable",
+    type: "function",
+  },
+  {
+    inputs: [
+      {
+        internalType: "address",
+        name: "from",
+        type: "address",
+      },
+      {
+        internalType: "address",
+        name: "to",
+        type: "address",
+      },
+      {
+        internalType: "uint256",
+        name: "tokenId",
+        type: "uint256",
+      },
+      {
+        internalType: "bytes",
+        name: "data",
+        type: "bytes",
+      },
+    ],
+    name: "safeTransfer",
+    outputs: [],
+    stateMutability: "nonpayable",
+    type: "function",
+  },
+  {
+    inputs: [
+      {
+        internalType: "address",
+        name: "operator",
+        type: "address",
+      },
+      {
+        internalType: "bool",
+        name: "approved",
+        type: "bool",
+      },
+    ],
+    name: "setApprovalForAll",
+    outputs: [],
+    stateMutability: "nonpayable",
+    type: "function",
+  },
+  {
+    inputs: [
+      {
+        internalType: "bytes4",
+        name: "interfaceId",
+        type: "bytes4",
+      },
+    ],
+    name: "supportsInterface",
+    outputs: [
+      {
+        internalType: "bool",
+        name: "",
+        type: "bool",
+      },
+    ],
+    stateMutability: "view",
+    type: "function",
+  },
+  {
+    inputs: [],
+    name: "symbol",
+    outputs: [
+      {
+        internalType: "string",
+        name: "",
+        type: "string",
+      },
+    ],
+    stateMutability: "view",
+    type: "function",
+  },
+  {
+    inputs: [
+      {
+        internalType: "uint256",
+        name: "tokenId",
+        type: "uint256",
+      },
+    ],
+    name: "tokenURI",
+    outputs: [
+      {
+        internalType: "string",
+        name: "",
+        type: "string",
+      },
+    ],
+    stateMutability: "view",
+    type: "function",
+  },
+  {
+    inputs: [],
+    name: "totalSupply",
+    outputs: [
+      {
+        internalType: "uint256",
+        name: "",
+        type: "uint256",
+      },
+    ],
+    stateMutability: "view",
+    type: "function",
+  },
+  {
+    inputs: [
+      {
+        internalType: "address",
+        name: "to",
+        type: "address",
+      },
+      {
+        internalType: "uint256",
+        name: "tokenId",
+        type: "uint256",
+      },
+    ],
+    name: "transferFrom",
+    outputs: [],
+    stateMutability: "nonpayable",
+    type: "function",
+  },
+  {
+    inputs: [
+      {
+        internalType: "address",
+        name: "newOwner",
+        type: "address",
+      },
+    ],
+    name: "transferOwnership",
+    outputs: [],
+    stateMutability: "nonpayable",
+    type: "function",
+  },
 ]
 

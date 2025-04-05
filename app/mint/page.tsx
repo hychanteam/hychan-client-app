@@ -3,22 +3,50 @@
 import { useState, useEffect } from "react"
 import Link from "next/link"
 import Image from "next/image"
-import { ArrowLeft, Loader2, AlertCircle, CheckCircle2, Gift, Sparkles } from "lucide-react"
+import { ArrowLeft, Loader2, AlertCircle, CheckCircle2, Gift, Sparkles, DiscIcon as Discord } from "lucide-react"
 import { ethers } from "ethers"
+import { formatTimeRemaining } from "../utils/time-utils"
 import {
-  CONTRACT_ABI,
-  getContract,
-  getCurrentPhaseInfo,
-  getSupplyInfo,
-  getUserPhaseMintsInfo,
-  getDegenMintInfo,
-  formatTimeRemaining,
-  generateMerkleProof,
-  mockGTDWhitelist,
-  mockFCFSWhitelist,
-} from "../../lib/contract"
+  getDiscordAuthUrl,
+  storeWalletAddress,
+  getDiscordCredentials,
+  clearDiscordCredentials,
+} from "../utils/discord-auth"
 
-const expectedChainId = BigInt(process.env.NEXT_PUBLIC_EXPECTED_CHAIN_ID!)
+// Mock data for testing
+const mockPhaseInfo = {
+  phaseIndex: 0,
+  phaseName: "GTD Mint (Phase 1)",
+  startTime: Math.floor(Date.now() / 1000) - 86400, // 1 day ago
+  endTime: Math.floor(Date.now() / 1000) + 86400 * 3, // 3 days from now
+  active: true,
+  categories: [
+    {
+      index: 0,
+      name: "Category 1",
+      price: ethers.parseEther("2"),
+      maxMintPerWallet: 2,
+    },
+  ],
+}
+
+const mockSupplyInfo = {
+  maxSupply: 10000,
+  totalSupply: 3500,
+  remainingSupply: 6500,
+}
+
+const mockUserPhaseInfo = {
+  categories: [
+    {
+      index: 0,
+      maxMintPerWallet: 2,
+      mintedCount: 0,
+      remainingMints: 2,
+    },
+  ],
+  hasFullyMinted: false,
+}
 
 export default function MintPage() {
   // State variables
@@ -26,32 +54,18 @@ export default function MintPage() {
   const [isConnected, setIsConnected] = useState<boolean>(false)
   const [isConnecting, setIsConnecting] = useState<boolean>(false)
   const [provider, setProvider] = useState<any>(null)
-  const [contract, setContract] = useState<ethers.Contract | null>(null)
+  const [contract, setContract] = useState<any>(null)
   const [mintAmount, setMintAmount] = useState<number>(1)
   const [isMinting, setIsMinting] = useState<boolean>(false)
   const [error, setError] = useState<string>("")
   const [success, setSuccess] = useState<string>("")
-  const [phaseInfo, setPhaseInfo] = useState<any>({
-    phaseIndex: -1,
-    phaseName: "Loading...",
-    startTime: 0,
-    endTime: 0,
-    active: false,
-    categories: [],
-  })
-  const [supplyInfo, setSupplyInfo] = useState<any>({
-    maxSupply: 0,
-    totalSupply: 0,
-    remainingSupply: 0,
-  })
-  const [userPhaseInfo, setUserPhaseInfo] = useState<any>({
-    categories: [],
-    hasFullyMinted: false,
-  })
+  const [phaseInfo, setPhaseInfo] = useState(mockPhaseInfo)
+  const [supplyInfo, setSupplyInfo] = useState(mockSupplyInfo)
+  const [userPhaseInfo, setUserPhaseInfo] = useState(mockUserPhaseInfo)
   const [degenMintInfo, setDegenMintInfo] = useState<any>({
     mintedCount: 0,
-    maxMintPerWallet: 0,
-    remainingMints: 0,
+    maxMintPerWallet: 1,
+    remainingMints: 1,
     price: ethers.parseEther("3"),
   })
   const [timeRemaining, setTimeRemaining] = useState<string>("")
@@ -60,17 +74,11 @@ export default function MintPage() {
   const [selectedCategory, setSelectedCategory] = useState<number>(0)
   const [showDegenSurprise, setShowDegenSurprise] = useState<boolean>(false)
   const [isDegenRevealed, setIsDegenRevealed] = useState<boolean>(false)
+  const [userData, setUserData] = useState<any>(null)
 
-  const checkNetwork = async (provider: ethers.BrowserProvider) =>{
-    // Check network
-    const network = await provider.getNetwork();
-    console.log("Connected to:", network.name, "Chain ID:", network.chainId);
-
-    if (network.chainId !== expectedChainId) {
-        setError("Wrong network! Please switch to the correct network.");
-        return;
-    }
-  }
+  // Discord state
+  const [discordId, setDiscordId] = useState<string | null>(null)
+  const [discordUsername, setDiscordUsername] = useState<string | null>(null)
 
   // Connect wallet function
   const connectWallet = async () => {
@@ -83,20 +91,41 @@ export default function MintPage() {
         const accounts = await provider.send("eth_requestAccounts", [])
 
         if (accounts.length > 0) {
-          setWalletAddress(accounts[0])
+          const address = accounts[0]
+          setWalletAddress(address)
           setIsConnected(true)
           setProvider(provider)
 
-          await checkNetwork(provider);
+          // Fetch user data from the API
+          try {
+            const response = await fetch("/api/user-data", {
+              method: "POST",
+              headers: {
+                "Content-Type": "application/json",
+              },
+              body: JSON.stringify({ address }),
+            })
 
-          // Initialize contract
-          const contract = await getContract(provider)
-          setContract(contract)
+            if (response.ok) {
+              const data = await response.json()
+              setUserData(data)
+              console.log("User data fetched:", data)
+
+              // Show success message if Discord roles were assigned
+              if (data.roleAssigned) {
+                setSuccess("Discord roles assigned successfully!")
+              }
+            } else {
+              console.error("Failed to fetch user data:", await response.text())
+            }
+          } catch (apiError) {
+            console.error("API error:", apiError)
+          }
         }
       } else {
         setError("No Ethereum wallet detected. Please install MetaMask.")
       }
-    } catch (err) {
+    } catch (err: any) {
       console.error("Error connecting wallet:", err)
       setError("Failed to connect wallet. Please try again.")
     } finally {
@@ -110,91 +139,82 @@ export default function MintPage() {
     setIsConnected(false)
     setProvider(null)
     setContract(null)
-    setUserPhaseInfo({
-      categories: [],
-      hasFullyMinted: false,
-    })
+    setUserPhaseInfo(mockUserPhaseInfo)
     setDegenMintInfo({
       mintedCount: 0,
-      maxMintPerWallet: 0,
-      remainingMints: 0,
+      maxMintPerWallet: 1,
+      remainingMints: 1,
       price: ethers.parseEther("3"),
     })
     setShowDegenSurprise(false)
     setIsDegenRevealed(false)
+    setUserData(null)
+  }
+
+  // Connect Discord function
+  const connectDiscord = () => {
+    // Make sure we store the current wallet address before redirecting
+    if (walletAddress) {
+      storeWalletAddress(walletAddress)
+    }
+
+    window.location.href = getDiscordAuthUrl()
+  }
+
+  // Disconnect Discord function
+  const disconnectDiscord = () => {
+    setDiscordId(null)
+    setDiscordUsername(null)
+
+    // Clear Discord cookies
+    document.cookie = "discord_user_id=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;"
+    document.cookie = "discord_username=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;"
+
+    // Clear Discord credentials from localStorage
+    clearDiscordCredentials()
   }
 
   // Regular mint function
   const mint = async () => {
-    if (!contract || !isConnected) return
+    if (!isConnected) return
 
     setIsMinting(true)
     setError("")
     setSuccess("")
 
     try {
-      let tx
+      // Simulate minting delay
+      await new Promise((resolve) => setTimeout(resolve, 2000))
 
-      // Different mint functions based on phase
-      if (phaseInfo.phaseIndex === 0) {
-        // GTD Phase
-        const allowedMints = 2 // Based on deploy script
-        const proof = generateMerkleProof(walletAddress, allowedMints, mockGTDWhitelist)
-
-        tx = await contract.safeMint(
-          mintAmount,
-          allowedMints,
-          selectedCategory, // Category index
-          proof,
-          { value: ethers.parseEther((2 * mintAmount).toString()) }, // 2 HYPE per NFT
-        )
-      } else if (phaseInfo.phaseIndex === 1) {
-        // FCFS Phase
-        const allowedMints = 1 // Based on deploy script
-        const proof = generateMerkleProof(walletAddress, allowedMints, mockFCFSWhitelist)
-
-        tx = await contract.safeMint(
-          mintAmount,
-          allowedMints,
-          selectedCategory, // Category index
-          proof,
-          { value: ethers.parseEther((2 * mintAmount).toString()) }, // 2 HYPE per NFT
-        )
-      } else if (phaseInfo.phaseIndex === 2) {
-        // Public Phase
-        tx = await contract.safeMint(
-          mintAmount,
-          0, // Not used for public mint
-          selectedCategory, // Category index
-          [], // Empty proof for public mint
-          { value: ethers.parseEther((2 * mintAmount).toString()) }, // 2 HYPE per NFT
-        )
-      }
-
-      await tx.wait()
       setSuccess(`Successfully minted ${mintAmount} HYCHAN NFT${mintAmount > 1 ? "s" : ""}!`)
+
+      // Update mock data to simulate minting
+      setUserPhaseInfo((prev) => {
+        const updatedCategories = [...prev.categories]
+        updatedCategories[selectedCategory] = {
+          ...updatedCategories[selectedCategory],
+          mintedCount: updatedCategories[selectedCategory].mintedCount + mintAmount,
+          remainingMints: updatedCategories[selectedCategory].remainingMints - mintAmount,
+        }
+
+        return {
+          ...prev,
+          categories: updatedCategories,
+          hasFullyMinted: updatedCategories.every((cat) => cat.remainingMints <= 0),
+        }
+      })
+
+      setSupplyInfo((prev) => ({
+        ...prev,
+        totalSupply: prev.totalSupply + mintAmount,
+        remainingSupply: prev.remainingSupply - mintAmount,
+      }))
 
       // Refresh data after successful mint
       setRefreshCounter((prev) => prev + 1)
     } catch (err: any) {
       console.error("Error minting:", err)
-
-      // Extract error message from blockchain error
-      let errorMessage = "Failed to mint. Please try again."
-
-      if (err.reason) {
-        errorMessage = err.reason
-      } else if (err.message) {
-        // Try to extract the revert reason
-        const match = err.message.match(/reverted with reason string '([^']+)'/)
-        if (match && match[1]) {
-          errorMessage = match[1]
-        } else if (err.message.includes("user rejected transaction")) {
-          errorMessage = "Transaction was rejected."
-        }
-      }
-
-      setError(errorMessage)
+      setError("Failed to mint. Please try again.")
     } finally {
       setIsMinting(false)
     }
@@ -202,115 +222,44 @@ export default function MintPage() {
 
   // Degen mint function
   const degenMint = async () => {
-    if (!contract || !isConnected) return;
+    if (!isConnected) return
 
-    setIsMinting(true);
-    setError("");
-    setSuccess("");
+    setIsMinting(true)
+    setError("")
+    setSuccess("")
 
     try {
-        const degenPrice = degenMintInfo.price;
-        const tx = await contract.degenSafeMint(
-            1, // Always mint 1 for degen
-            { value: degenPrice } // 3 HYPE per NFT for degen mint
-        );
+      // Simulate minting delay
+      await new Promise((resolve) => setTimeout(resolve, 2000))
 
-        await tx.wait();
-        setSuccess(`Successfully minted a HYCHAN!`);
+      setSuccess(`Successfully minted a DEGEN HYCHAN NFT!`)
 
-        // Refresh data after successful mint
-        setRefreshCounter((prev) => prev + 1);
+      // Update mock data to simulate minting
+      setDegenMintInfo((prev) => ({
+        ...prev,
+        mintedCount: prev.mintedCount + 1,
+        remainingMints: prev.remainingMints - 1,
+      }))
+
+      setSupplyInfo((prev) => ({
+        ...prev,
+        totalSupply: prev.totalSupply + 1,
+        remainingSupply: prev.remainingSupply - 1,
+      }))
+
+      // Refresh data after successful mint
+      setRefreshCounter((prev) => prev + 1)
     } catch (err: any) {
-        console.error("Error minting degen:", err);
-
-        // Default error message
-        let errorMessage = "Failed to mint. Please try again.";
-
-        if (err.reason) {
-            errorMessage = err.reason;
-        } else if (err.message) {
-            // Handle user rejection
-            if (err.message.includes("user rejected transaction")) {
-                errorMessage = "Transaction was rejected.";
-            }
-        }
-
-        // Handle custom Solidity errors
-        if (err.data) {
-            try {
-                const iface = new ethers.Interface(CONTRACT_ABI);
-                const decodedError = iface.parseError(err.data);
-
-                if (decodedError) {
-                    errorMessage = `Error: ${decodedError.name}`;
-
-                    // If the custom error has parameters, include them in the message
-                    if (decodedError.args && decodedError.args.length > 0) {
-                        errorMessage += ` (${decodedError.args.join(", ")})`;
-                    }
-                }
-            } catch (decodeError) {
-                console.warn("Failed to decode custom error:", decodeError);
-            }
-        }
-
-        setError(errorMessage);
+      console.error("Error minting degen:", err)
+      setError("Failed to mint. Please try again.")
     } finally {
-        setIsMinting(false);
+      setIsMinting(false)
     }
-};
+  }
 
   // Reveal degen mint
   const revealDegenMint = () => {
     setIsDegenRevealed(true)
-  }
-
-  // Fetch contract data
-  const fetchContractData = async () => {
-    if (!contract || !isConnected) return
-
-    try {
-      // Get phase info
-      const phase = await getCurrentPhaseInfo(contract)
-      setPhaseInfo(phase)
-
-      // Get supply info
-      const supply = await getSupplyInfo(contract)
-      setSupplyInfo(supply)
-
-      // Get user mint info for the current phase
-      if (walletAddress && phase.phaseIndex >= 0) {
-        const userInfo = await getUserPhaseMintsInfo(contract, walletAddress, phase.phaseIndex)
-        setUserPhaseInfo(userInfo)
-
-        // Check if user has fully minted their allocation
-        if (userInfo.hasFullyMinted) {
-          setShowDegenSurprise(true)
-
-          // Get degen mint info
-          const degenInfo = await getDegenMintInfo(contract, walletAddress)
-          setDegenMintInfo(degenInfo)
-        } else {
-          setShowDegenSurprise(false)
-          setIsDegenRevealed(false)
-        }
-      }
-
-      // Set mint price based on phase
-      if (phase.phaseIndex === -1) {
-        setMintPrice("Minting Paused")
-      } else {
-        // Get price from the selected category if available
-        if (phase.categories && phase.categories.length > selectedCategory) {
-          const categoryPrice = ethers.formatEther(phase.categories[selectedCategory].price)
-          setMintPrice(`${categoryPrice} HYPE`)
-        } else {
-          setMintPrice("2 HYPE")
-        }
-      }
-    } catch (err) {
-      console.error("Error fetching contract data:", err)
-    }
   }
 
   // Update time remaining
@@ -320,57 +269,73 @@ export default function MintPage() {
     }
   }
 
-  // Effect for initial wallet connection check
-  useEffect(() => {
-    const checkConnection = async () => {
-      if (window.ethereum) {
-        try {
-          const provider = new ethers.BrowserProvider(window.ethereum)
-          const accounts = await provider.send("eth_accounts", [])
+  const checkConnection = async () => {
+    if (window.ethereum) {
+      try {
+        const provider = new ethers.BrowserProvider(window.ethereum)
+        const accounts = await provider.send("eth_accounts", [])
 
-          if (accounts.length > 0) {
-            setWalletAddress(accounts[0])
-            setIsConnected(true)
-            setProvider(provider)
+        if (accounts.length > 0) {
+          const address = accounts[0]
+          setWalletAddress(address)
+          setIsConnected(true)
+          setProvider(provider)
 
-            await checkNetwork(provider);
+          // Fetch user data from the API
+          try {
+            const response = await fetch("/api/user-data", {
+              method: "POST",
+              headers: {
+                "Content-Type": "application/json",
+              },
+              body: JSON.stringify({ address }),
+            })
 
-            // Initialize contract
-            const contract = await getContract(provider)
-            setContract(contract)
+            if (response.ok) {
+              const data = await response.json()
+              setUserData(data)
+              console.log("User data fetched:", data)
+            } else {
+              console.error("Failed to fetch user data:", await response.text())
+            }
+          } catch (apiError) {
+            console.error("API error:", apiError)
           }
-        } catch (err) {
-          console.error("Error checking wallet connection:", err)
         }
+      } catch (err) {
+        console.error("Error checking wallet connection:", err)
       }
     }
 
+    // Check for Discord credentials
+    const credentials = getDiscordCredentials()
+    if (credentials && credentials.id) {
+      setDiscordId(credentials.id)
+      setDiscordUsername(credentials.username || null)
+    }
+  }
+
+  // Effect for initial wallet connection check
+  useEffect(() => {
     checkConnection()
 
     // Listen for account changes
     if (window.ethereum) {
-      window.ethereum.on("accountsChanged", (accounts: string[]) => {
+      const handleAccountsChanged = (accounts: string[]) => {
         if (accounts.length > 0) {
           setWalletAddress(accounts[0])
         } else {
           disconnectWallet()
         }
-      })
-    }
+      }
 
-    return () => {
-      if (window.ethereum) {
-        window.ethereum.removeListener("accountsChanged", () => {})
+      window.ethereum.on("accountsChanged", handleAccountsChanged)
+
+      return () => {
+        window.ethereum.removeListener("accountsChanged", handleAccountsChanged)
       }
     }
   }, [])
-
-  // Effect for fetching contract data
-  useEffect(() => {
-    if (contract && isConnected) {
-      fetchContractData()
-    }
-  }, [contract, isConnected, walletAddress, refreshCounter, selectedCategory])
 
   // Effect for updating time remaining
   useEffect(() => {
@@ -384,6 +349,26 @@ export default function MintPage() {
       return () => clearInterval(interval)
     }
   }, [phaseInfo.endTime])
+
+  // Check for stored Discord credentials on mount
+  useEffect(() => {
+    const checkDiscordCredentials = () => {
+      const credentials = getDiscordCredentials()
+      if (credentials && credentials.id) {
+        setDiscordId(credentials.id)
+        setDiscordUsername(credentials.username || null)
+      }
+    }
+
+    checkDiscordCredentials()
+  }, [])
+
+  // Effect to check if user has fully minted and show degen surprise
+  useEffect(() => {
+    if (userPhaseInfo.hasFullyMinted) {
+      setShowDegenSurprise(true)
+    }
+  }, [userPhaseInfo.hasFullyMinted])
 
   // Increment mint amount
   const incrementMintAmount = () => {
@@ -423,8 +408,8 @@ export default function MintPage() {
       {/* Background image with overlay */}
       <div className="absolute inset-0 z-0">
         <Image
-          src="/assets/images/png/landing-background.png"
-          alt="landing-background"
+          src="https://hebbkx1anhila5yf.public.blob.vercel-storage.com/Rectangle%201-6aQI9xYKydSUtuVtbEVngPhJyZWgPo.png"
+          alt="Background art"
           fill
           priority
           className="object-cover object-center"
@@ -439,41 +424,65 @@ export default function MintPage() {
             <span>Back to Home</span>
           </Link>
 
-          {isConnected ? (
-            <button
-              onClick={disconnectWallet}
-              className="bg-transparent border border-white/30 text-white py-2 px-4 rounded-md hover:bg-white/10 transition-colors text-sm"
-            >
-              {walletAddress.substring(0, 6)}...{walletAddress.substring(walletAddress.length - 4)}
-            </button>
-          ) : (
-            <button
-              onClick={connectWallet}
-              disabled={isConnecting}
-              className="bg-teal-400 hover:bg-teal-300 text-teal-900 py-2 px-4 rounded-md font-medium transition-colors disabled:opacity-70 disabled:cursor-not-allowed flex items-center"
-            >
-              {isConnecting ? (
-                <>
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  Connecting...
-                </>
-              ) : (
-                "Connect Wallet"
-              )}
-            </button>
-          )}
+          <div className="flex gap-2">
+            {/* Wallet Connect Button */}
+            {isConnected ? (
+              <button
+                onClick={disconnectWallet}
+                className="bg-transparent border border-white/30 text-white py-2 px-4 rounded-md hover:bg-white/10 transition-colors text-sm"
+              >
+                {walletAddress.substring(0, 6)}...{walletAddress.substring(walletAddress.length - 4)}
+              </button>
+            ) : (
+              <button
+                onClick={connectWallet}
+                disabled={isConnecting}
+                className="bg-teal-400 hover:bg-teal-300 text-teal-900 py-2 px-4 rounded-md font-medium transition-colors disabled:opacity-70 disabled:cursor-not-allowed flex items-center"
+              >
+                {isConnecting ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    Connecting...
+                  </>
+                ) : (
+                  "Connect Wallet"
+                )}
+              </button>
+            )}
+
+            {/* Discord Connect Button */}
+            {discordId ? (
+              <button
+                onClick={disconnectDiscord}
+                className="bg-indigo-600 hover:bg-indigo-700 text-white py-2 px-4 rounded-md transition-colors flex items-center"
+              >
+                <Discord className="mr-2 h-4 w-4" />
+                {discordUsername || "Discord"}
+              </button>
+            ) : (
+              <button
+                onClick={connectDiscord}
+                className="bg-indigo-600 hover:bg-indigo-700 text-white py-2 px-4 rounded-md transition-colors flex items-center"
+              >
+                <Discord className="mr-2 h-4 w-4" />
+                Link Discord
+              </button>
+            )}
+          </div>
         </header>
 
         <div className="flex-1 flex flex-col items-center justify-center text-center relative mt-8">
-          <div className="text-4xl md:text-7xl font-bold tracking-wider mb-6">
-              <Image
-                  src="/assets/images/png/title-large.png"
-                  alt="HYCHAN"
-                  width={200} // Smaller width for mobile
-                  height={60}
-                  className="mx-auto md:w-[300px] md:h-[90px]"
-              />
+          <div className="w-32 md:w-40 mb-8">
+            <Image
+              src="https://hebbkx1anhila5yf.public.blob.vercel-storage.com/Calque%202-hpnSjPu4yrcEBdYZoeZzyVQIM7m7vL.png"
+              alt="HYCHAN"
+              width={160}
+              height={48}
+              priority
+            />
           </div>
+
+          <h1 className="text-3xl md:text-4xl font-bold mb-4">HYCHAN Mint</h1>
 
           <div className="w-full max-w-md bg-teal-900/60 backdrop-blur-sm p-6 rounded-lg border border-white/10 mb-8">
             {/* Phase Info */}
@@ -680,7 +689,7 @@ export default function MintPage() {
               </div>
             ) : (
               <div className="text-center py-6">
-                <p className="mb-4">Connect your wallet to mint HYCHAN</p>
+                <p className="mb-4">Connect your wallet to mint HYCHAN NFTs</p>
                 <button
                   onClick={connectWallet}
                   disabled={isConnecting}
@@ -735,4 +744,3 @@ export default function MintPage() {
     </main>
   )
 }
-
