@@ -398,7 +398,7 @@ export default function CheckWallet() {
             <span>Back to Home</span>
           </Link>
 
-          <div className="flex gap-2">
+          <div className="hidden md:flex gap-2">
             {/* Wallet Connect Button */}
             {isConnected ? (
               <button
