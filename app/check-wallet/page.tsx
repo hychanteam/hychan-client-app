@@ -479,7 +479,7 @@ export default function CheckWallet() {
               />
           </div>
 
-          <h1 className="text-3xl md:text-4xl font-bold mb-8 mt-6">Wallet Checker</h1>
+          <h1 className="text-3xl md:text-4xl mb-8 mt-6">Wallet Checker</h1>
 
           <div className="w-full max-w-md bg-teal-900/60 backdrop-blur-sm p-6 rounded-lg border border-white/10">
             {/* Error message */}
