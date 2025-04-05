@@ -11,7 +11,6 @@ export async function GET(request: Request) {
   // Get the code and state from the URL
   const url = new URL(request.url)
   const code = url.searchParams.get("code")
-  const state = url.searchParams.get("state")
 
   if (!code) {
     return NextResponse.redirect(`${url.origin}?error=no_code`)

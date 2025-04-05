@@ -103,16 +103,25 @@ export default function CheckWallet() {
         setError("No Ethereum wallet detected. Please install MetaMask.")
       }
       return false // Failed to connect
-    } catch (err: any) {
-      console.error("Error connecting wallet:", err)
-
-      // Don't show the "already pending" error to the user
-      const isPendingError = err.code === -32002 || (err.message && err.message.includes("already pending"))
-
-      if (!silent && !isPendingError) {
-        setError("Failed to connect wallet. Please try again.")
+    } catch (err: unknown) {
+      console.error("Error connecting wallet:", err);
+    
+      if (typeof err === "object" && err !== null) {
+        const error = err as { code?: number; message?: string };
+    
+        const isPendingError =
+          error.code === -32002 || (error.message && error.message.includes("already pending"));
+    
+        if (!silent && !isPendingError) {
+          setError("Failed to connect wallet. Please try again.");
+        }
+      } else {
+        if (!silent) {
+          setError("An unknown error occurred.");
+        }
       }
-      return false
+    
+      return false;
     } finally {
       if (!silent) setIsConnecting(false)
 
@@ -202,7 +211,7 @@ export default function CheckWallet() {
     if (!isConnected) {
       autoConnectWallet()
     }
-  }, [])
+  }, []) // eslint-disable-next-line react-hooks/exhaustive-deps
 
   // Listen for account changes
   useEffect(() => {

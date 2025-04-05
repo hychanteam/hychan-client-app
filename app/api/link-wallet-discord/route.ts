@@ -141,9 +141,6 @@ export async function POST(request: Request) {
                   })
       
                   const responseText = await response.text()
-                  const logMessage = response.ok
-                    ? `Role ${roleId} assigned successfully.`
-                    : `Failed to assign role ${roleId}. Status: ${response.status}. Response: ${responseText}`
       
                   return {
                     roleId,
