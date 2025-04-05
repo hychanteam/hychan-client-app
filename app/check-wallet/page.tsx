@@ -586,11 +586,9 @@ export default function CheckWallet() {
                 )}
 
                 {checkResult.eligible && (
-                  <Link href="/mint" className="block mt-6">
-                    <button className="bg-teal-400 hover:bg-teal-300 text-teal-900 py-2 px-6 rounded-md font-medium transition-colors w-full">
-                      Mint coming soon
-                    </button>
-                  </Link>
+                  <button className="bg-teal-400 hover:bg-teal-300 text-teal-900 py-2 px-6 rounded-md font-medium transition-colors w-full">
+                    Mint coming soon
+                  </button>
                 )}
               </div>
             )}
