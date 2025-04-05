@@ -256,21 +256,6 @@ export default function CheckWallet() {
     setShowSuccessConfetti(false)
 
     try {
-      // First, fetch user data
-      const userDataResponse = await fetch("/api/user-data", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({ address }),
-      })
-
-      if (!userDataResponse.ok) {
-        throw new Error("Failed to fetch user data")
-      }
-
-      const userData = await userDataResponse.json()
-
       // Then check eligibility
       const response = await fetch("/api/check-wallet", {
         method: "POST",
@@ -287,13 +272,6 @@ export default function CheckWallet() {
         const errorMessage = result.error || "Failed to check eligibility"
         console.error("API error:", errorMessage)
         throw new Error(errorMessage)
-      }
-
-      // Add Discord role assignment message if applicable
-      if (userData.roleAssigned) {
-        result.message += " Discord roles have been assigned to your account."
-      } else if (userData.dcId && userData.dcRoles && userData.dcRoles.length > 0) {
-        result.message += " " + userData.message
       }
 
       setCheckResult(result)
