@@ -103,16 +103,25 @@ export default function CheckWallet() {
         setError("No Ethereum wallet detected. Please install MetaMask.")
       }
       return false // Failed to connect
-    } catch (err: any) {
-      console.error("Error connecting wallet:", err)
-
-      // Don't show the "already pending" error to the user
-      const isPendingError = err.code === -32002 || (err.message && err.message.includes("already pending"))
-
-      if (!silent && !isPendingError) {
-        setError("Failed to connect wallet. Please try again.")
+    } catch (err: unknown) {
+      console.error("Error connecting wallet:", err);
+    
+      if (typeof err === "object" && err !== null) {
+        const error = err as { code?: number; message?: string };
+    
+        const isPendingError =
+          error.code === -32002 || (error.message && error.message.includes("already pending"));
+    
+        if (!silent && !isPendingError) {
+          setError("Failed to connect wallet. Please try again.");
+        }
+      } else {
+        if (!silent) {
+          setError("An unknown error occurred.");
+        }
       }
-      return false
+    
+      return false;
     } finally {
       if (!silent) setIsConnecting(false)
 
@@ -202,7 +211,7 @@ export default function CheckWallet() {
     if (!isConnected) {
       autoConnectWallet()
     }
-  }, [])
+  }, []) // eslint-disable-next-line react-hooks/exhaustive-deps
 
   // Listen for account changes
   useEffect(() => {
@@ -247,22 +256,6 @@ export default function CheckWallet() {
     setShowSuccessConfetti(false)
 
     try {
-      // First, fetch user data
-      const userDataResponse = await fetch("/api/user-data", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({ address }),
-      })
-
-      if (!userDataResponse.ok) {
-        throw new Error("Failed to fetch user data")
-      }
-
-      const userData = await userDataResponse.json()
-      console.log("User data:", userData)
-
       // Then check eligibility
       const response = await fetch("/api/check-wallet", {
         method: "POST",
@@ -279,13 +272,6 @@ export default function CheckWallet() {
         const errorMessage = result.error || "Failed to check eligibility"
         console.error("API error:", errorMessage)
         throw new Error(errorMessage)
-      }
-
-      // Add Discord role assignment message if applicable
-      if (userData.roleAssigned) {
-        result.message += " Discord roles have been assigned to your account."
-      } else if (userData.dcId && userData.dcRoles && userData.dcRoles.length > 0) {
-        result.message += " " + userData.message
       }
 
       setCheckResult(result)
@@ -412,7 +398,7 @@ export default function CheckWallet() {
             <span>Back to Home</span>
           </Link>
 
-          <div className="flex gap-2">
+          <div className="hidden md:flex gap-2">
             {/* Wallet Connect Button */}
             {isConnected ? (
               <button
@@ -471,7 +457,7 @@ export default function CheckWallet() {
               />
           </div>
 
-          <h1 className="text-3xl md:text-4xl font-bold mb-8 mt-6">Wallet Checker</h1>
+          <h1 className="text-3xl md:text-4xl mb-8 mt-6">Wallet Checker</h1>
 
           <div className="w-full max-w-md bg-teal-900/60 backdrop-blur-sm p-6 rounded-lg border border-white/10">
             {/* Error message */}
@@ -549,7 +535,7 @@ export default function CheckWallet() {
                       {checkResult.message} Join our Discord community to learn how you can get on the allowlist!
                     </p>
                     <Link
-                      href="https://discord.gg/hychan"
+                      href="https://discord.gg/hychanhl"
                       target="_blank"
                       rel="noopener noreferrer"
                       className="inline-block mt-2 bg-teal-800/70 hover:bg-teal-700 text-white py-2 px-4 rounded-md transition-colors"
@@ -600,11 +586,9 @@ export default function CheckWallet() {
                 )}
 
                 {checkResult.eligible && (
-                  <Link href="/mint" className="block mt-6">
-                    <button className="bg-teal-400 hover:bg-teal-300 text-teal-900 py-2 px-6 rounded-md font-medium transition-colors w-full">
-                      Mint coming soon
-                    </button>
-                  </Link>
+                  <button className="bg-teal-400 hover:bg-teal-300 text-teal-900 py-2 px-6 rounded-md font-medium transition-colors w-full">
+                    Mint coming soon
+                  </button>
                 )}
               </div>
             )}

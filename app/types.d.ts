@@ -1,3 +1,5 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
+
 // Add TypeScript declarations for window.ethereum
 interface Window {
   ethereum?: {
@@ -8,3 +10,4 @@ interface Window {
   }
 }
 
+/* eslint-enable @typescript-eslint/no-explicit-any */

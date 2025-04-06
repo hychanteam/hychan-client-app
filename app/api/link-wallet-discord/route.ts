@@ -141,11 +141,6 @@ export async function POST(request: Request) {
                   })
       
                   const responseText = await response.text()
-                  const logMessage = response.ok
-                    ? `Role ${roleId} assigned successfully.`
-                    : `Failed to assign role ${roleId}. Status: ${response.status}. Response: ${responseText}`
-      
-                  console.log(logMessage)
       
                   return {
                     roleId,
@@ -166,12 +161,16 @@ export async function POST(request: Request) {
             )
       
             roleAssigned = assignmentResults.every((result) => result.success)
+            // roleMessage = roleAssigned
+            //   ? "All Discord roles assigned successfully."
+            //   : `Some roles failed to assign:\n${assignmentResults
+            //       .filter((r) => !r.success)
+            //       .map((r) => `- Role ${r.roleId}: ${r.status} ${r.error || r.message || "Unknown error"}`)
+            //       .join("\n")}`
+
             roleMessage = roleAssigned
               ? "All Discord roles assigned successfully."
-              : `Some roles failed to assign:\n${assignmentResults
-                  .filter((r) => !r.success)
-                  .map((r) => `- Role ${r.roleId}: ${r.status} ${r.error || r.message || "Unknown error"}`)
-                  .join("\n")}`
+              : `Looks like you are not in discord, join here with the discord link https://discord.gg`
 
             if(roleAssigned){
               // Update the wallet with the Discord ID

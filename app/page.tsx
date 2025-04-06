@@ -25,7 +25,6 @@ export default function Home() {
   const [isLinkingDiscord, setIsLinkingDiscord] = useState<boolean>(false)
   const [error, setError] = useState<string>("")
   const [success, setSuccess] = useState<string>("")
-  const [userData, setUserData] = useState<any>(null)
   const [discordId, setDiscordId] = useState<string | null>(null)
   const [discordUsername, setDiscordUsername] = useState<string | null>(null)
   const [isWalletLinked, setIsWalletLinked] = useState<boolean>(false)
@@ -120,16 +119,25 @@ export default function Home() {
           setErrorWithTimeout("No Ethereum wallet detected. Please install MetaMask.")
         }
         return false // Failed to connect
-      } catch (err: any) {
-        console.error("Error connecting wallet:", err)
-
-        // Don't show the "already pending" error to the user
-        const isPendingError = err.code === -32002 || (err.message && err.message.includes("already pending"))
-
-        if (!silent && !isPendingError) {
-          setErrorWithTimeout("Failed to connect wallet. Please try again.")
+      } catch (err: unknown) {
+        console.error("Error connecting wallet:", err);
+      
+        if (typeof err === "object" && err !== null) {
+          const error = err as { code?: number; message?: string };
+      
+          const isPendingError =
+            error.code === -32002 || (error.message && error.message.includes("already pending"));
+      
+          if (!silent && !isPendingError) {
+            setError("Failed to connect wallet. Please try again.");
+          }
+        } else {
+          if (!silent) {
+            setError("An unknown error occurred.");
+          }
         }
-        return false
+      
+        return false;
       } finally {
         if (!silent) setIsConnecting(false)
 
@@ -171,7 +179,6 @@ export default function Home() {
           throw new Error(data.error || "Failed to link wallet with Discord")
         }
 
-        setUserData(data)
         setIsWalletLinked(true)
 
         // Store Discord credentials for persistence
@@ -222,7 +229,6 @@ export default function Home() {
             .then((response) => response.json())
             .then((data) => {
               if (data.dcId === credentials.id) {
-                setUserData(data)
                 setIsWalletLinked(true)
               }
             })
@@ -295,7 +301,6 @@ export default function Home() {
           setWalletAddress("")
           setIsConnected(false)
           setIsWalletLinked(false)
-          setUserData(null)
 
           // Clear stored wallet address
           clearWalletAddress()
@@ -396,7 +401,6 @@ export default function Home() {
   const disconnectWallet = () => {
     setWalletAddress("")
     setIsConnected(false)
-    setUserData(null)
     setSuccess("")
     setError("")
     setIsWalletLinked(false)
@@ -412,7 +416,6 @@ export default function Home() {
     setDiscordId(null)
     setDiscordUsername(null)
     setIsWalletLinked(false)
-    setUserData(null)
 
     // Clear Discord cookies
     document.cookie = "discord_user_id=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;"
