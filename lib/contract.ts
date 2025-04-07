@@ -1,34 +1,11 @@
 import { ethers } from "ethers"
-import keccak256 from "keccak256"
-import { MerkleTree } from "merkletreejs"
+import abiJson from "../abi.json" assert { type: "json" }; 
 
 // Contract address - replace with your actual contract address
 const CONTRACT_ADDRESS = process.env.NEXT_PUBLIC_CONTRACT_ADDRESS || ""
 
 // Contract ABI for the functions we need
-const contractABI = [
-  // View functions
-  "function mintPhases(uint256) view returns (uint256 startTime, uint256 endTime, uint256 phaseTimeLength)",
-  "function phaseIndex() view returns (int256)",
-  "function maxSupply() view returns (uint256)",
-  "function totalSupply() view returns (uint256)",
-  "function ownerAlloc() view returns (uint256)",
-  "function degenAlloc() view returns (uint256)",
-  "function maxDegenMintPerWallet() view returns (uint256)",
-  "function degenCost() view returns (uint256)",
-  "function revealed() view returns (bool)",
-  "function tradingEnabled() view returns (bool)",
-  "function categoryMintedCount(uint256,uint256) view returns (uint256)",
-  "function addressMintedBalance(uint256,uint256,address) view returns (uint256)",
-  "function degenMintedCount(address) view returns (uint256)",
-
-  // Write functions
-  "function safeMint(uint256 _mintAmount, uint256 _allowedMints, uint256 _categoryIndex, bytes32[] calldata _merkleProof) payable",
-  "function degenSafeMint(uint256 _mintAmount) payable",
-
-  // Events
-  "event Transfer(address indexed from, address indexed to, uint256 indexed tokenId)",
-]
+const contractABI = abiJson.abi
 
 // Interface for MintCategory
 export interface MintCategory {
@@ -45,6 +22,25 @@ export interface MintPhase {
   endTime: number
   phaseTimeLength: number
   categories: MintCategory[]
+}
+
+// Interface for whitelist data
+export interface WhitelistData {
+  address: string
+  allowedMintsGTD: number
+  allowedMintsFCFS: number
+  dcRole?: string | null
+  dcId?: string | null
+  isWhitelisted: boolean
+}
+
+// Interface for all whitelist data
+export interface AllWhitelistData {
+  allWhitelistData: {
+    address: string
+    allowedMintsGTD: number
+    allowedMintsFCFS: number
+  }[]
 }
 
 // Function to get the contract instance
@@ -76,32 +72,19 @@ export const getPhaseInfo = async (contract: ethers.Contract, phaseIndex: number
   try {
     if (phaseIndex < 0) return null
 
-    const phase = await contract.mintPhases(phaseIndex)
-
-    // We need to make additional calls to get the categories
-    // This is a simplified version - in a real implementation, you would need to
-    // query the contract to get the categories array length and then fetch each category
-
-    // For now, we'll assume we know the categories structure
-    // In a real implementation, you would need to create a custom method on your contract
-    // to return the full phase information including categories
-
-    // This is a placeholder - you'll need to implement this based on your contract structure
-    const categories: MintCategory[] = [
-      {
-        price: ethers.parseEther("2"),
-        merkleRoot: "0x1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef",
-        maxMintPerWallet: 2,
-        defaultMintableSupply: 5000,
-        mintableSupply: 5000,
-      },
-    ]
+    const phase = await contract.getMintPhase(phaseIndex)
 
     return {
       startTime: Number(phase.startTime),
       endTime: Number(phase.endTime),
       phaseTimeLength: Number(phase.phaseTimeLength),
-      categories: categories,
+      categories: phase.categories.map((cat: MintCategory) => ({
+        price: cat.price.toString(), // safe for large numbers
+        merkleRoot: cat.merkleRoot,
+        maxMintPerWallet: cat.maxMintPerWallet.toString(),
+        defaultMintableSupply: cat.defaultMintableSupply.toString(),
+        mintableSupply: cat.mintableSupply.toString(),
+      })),
     }
   } catch (error) {
     console.error("Error getting phase info:", error)
@@ -205,61 +188,63 @@ export const getDegenMintInfo = async (
   }
 }
 
-// Function to generate a merkle tree from a list of addresses and their allowed mints
-export const generateMerkleTree = (addressAllowances: { address: string; allowedMints: number }[]): MerkleTree => {
-  // Create leaf nodes by hashing address and allowed mints together
-  const leaves = addressAllowances.map((item) =>
-    keccak256(ethers.solidityPacked(["address", "uint256"], [item.address, item.allowedMints])),
-  )
+// Function to fetch whitelist data for a specific wallet from the API
+export const fetchWhitelistData = async (walletAddress: string): Promise<WhitelistData> => {
+  try {
+    const response = await fetch("/api/whitelist-data", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ walletAddress }),
+    })
 
-  // Create merkle tree
-  return new MerkleTree(leaves, keccak256, { sortPairs: true })
+    if (!response.ok) {
+      throw new Error(`API error: ${response.status}`)
+    }
+
+    const data = await response.json()
+    return data
+  } catch (error) {
+    console.error("Error fetching whitelist data:", error)
+    return {
+      address: walletAddress,
+      allowedMintsGTD: 0,
+      allowedMintsFCFS: 0,
+      isWhitelisted: false,
+    }
+  }
 }
 
-// Function to generate a merkle proof for a specific address and allowed mints
-export const generateMerkleProof = (
-  address: string,
-  allowedMints: number,
-  addressAllowances: { address: string; allowedMints: number }[],
-): string[] => {
-  // Create merkle tree
-  const merkleTree = generateMerkleTree(addressAllowances)
+// Function to fetch all whitelist data for Merkle tree generation
+export const fetchAllWhitelistData = async (
+  phaseIndex: number,
+): Promise<{ address: string; allowedMints: number }[]> => {
+  try {
+    const response = await fetch("/api/whitelist-data", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ fetchAll: true }),
+    })
 
-  // Create leaf for the specific address and allowed mints
-  const leaf = keccak256(ethers.solidityPacked(["address", "uint256"], [address, allowedMints]))
+    if (!response.ok) {
+      throw new Error(`API error: ${response.status}`)
+    }
 
-  // Generate proof
-  return merkleTree.getHexProof(leaf)
+    const data: AllWhitelistData = await response.json()
+
+    // Transform the data based on the phase
+    return data.allWhitelistData
+      .map((item) => ({
+        address: item.address,
+        // For GTD phase (0), use GTD allowance, for FCFS phase (1), use FCFS allowance
+        allowedMints: phaseIndex === 0 ? item.allowedMintsGTD : item.allowedMintsFCFS,
+      }))
+      .filter((item) => item.allowedMints > 0) // Only include entries with allowance > 0
+  } catch (error) {
+    console.error("Error fetching all whitelist data:", error)
+    return []
+  }
 }
-
-// For testing purposes, we can use this function to verify a proof
-export const verifyProof = (
-  address: string,
-  allowedMints: number,
-  proof: string[],
-  root: string,
-  addressAllowances: { address: string; allowedMints: number }[],
-): boolean => {
-  // Create merkle tree
-  const merkleTree = generateMerkleTree(addressAllowances)
-
-  // Create leaf for the specific address and allowed mints
-  const leaf = keccak256(ethers.solidityPacked(["address", "uint256"], [address, allowedMints]))
-
-  // Verify proof
-  return merkleTree.verify(proof, leaf, root)
-}
-
-// Mock whitelist data for testing - in a real implementation, this would come from your database
-export const mockGTDWhitelist = [
-  { address: "0xf39Fd6e51aad88F6F4ce6aB8829539bad25F8901", allowedMints: 2 },
-  { address: "0x70997970C51812dc3A010C7d01b50e0d17dc79C8", allowedMints: 2 },
-  { address: "0x3C44CdDdB6a900fa2b585dd299e03d12FA4293BC", allowedMints: 1 },
-]
-
-export const mockFCFSWhitelist = [
-  { address: "0x90F79bf6EB2c4f870365E785982E1ca93e6a4398", allowedMints: 1 },
-  { address: "0x15d34AAf54267DB7D7c367839AAf71A00a2C6A65", allowedMints: 1 },
-  { address: "0x9965507D1a55bcC2695C58ba16FB3763172Ea472", allowedMints: 1 },
-]
-
