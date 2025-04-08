@@ -80,11 +80,11 @@ export const getPhaseInfo = async (contract: ethers.Contract, phaseIndex: number
       endTime: Number(phase.endTime),
       phaseTimeLength: Number(phase.phaseTimeLength),
       categories: phase.categories.map((cat: MintCategory) => ({
-        price: cat.price.toString(), // safe for large numbers
+        price: Number(cat.price), // safe for large numbers
         merkleRoot: cat.merkleRoot,
-        maxMintPerWallet: cat.maxMintPerWallet.toString(),
-        defaultMintableSupply: cat.defaultMintableSupply.toString(),
-        mintableSupply: cat.mintableSupply.toString(),
+        maxMintPerWallet: Number(cat.maxMintPerWallet),
+        defaultMintableSupply: Number(cat.defaultMintableSupply),
+        mintableSupply: Number(cat.mintableSupply),
       })),
     }
   } catch (error) {

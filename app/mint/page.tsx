@@ -133,8 +133,6 @@ export default function MintPage() {
           const isEligibleForFCFS = whitelistData.allowedMintsFCFS > 0
           setIsUserEligible(isEligibleForGTD || isEligibleForFCFS)
 
-          console.log("Whitelist data fetched:", whitelistData)
-
           // Fetch contract data
           await fetchContractData(contract, address)
         }
@@ -233,7 +231,7 @@ export default function MintPage() {
 
           // Set mint price based on selected category
           if (phase.categories.length > selectedCategory) {
-            const categoryPrice = ethers.formatEther(phase.categories[selectedCategory].price)
+            const categoryPrice = ethers.formatEther(phase.categories[selectedCategory].price.toString())
             setMintPrice(`${categoryPrice} HYPE`)
           }
         }
@@ -280,12 +278,15 @@ export default function MintPage() {
             }),
           )
 
-          console.log(phase)
-
           setUserPhaseInfo({
             categories,
             hasFullyMinted: categories.every((cat) => cat.remainingMints <= 0),
           })
+
+          // Set user eligibility based on whitelist data
+          const isEligibleForGTD = allowedMintsGTD > 0
+          const isEligibleForFCFS = allowedMintsFCFS > 0
+          const isUserEligible = (isEligibleForGTD || isEligibleForFCFS)
 
           // Check if user has fully minted to show degen option
           // Only show degen mint if user is eligible (has mintAmounts from database)
@@ -580,8 +581,6 @@ export default function MintPage() {
       const isEligibleForFCFS = whitelistData.allowedMintsFCFS > 0
       setIsUserEligible(isEligibleForGTD || isEligibleForFCFS)
 
-      console.log("Whitelist data fetched from stored address:", whitelistData)
-
       // Also set up provider if window.ethereum is available
       if (window.ethereum) {
         const provider = new ethers.BrowserProvider(window.ethereum)
@@ -625,8 +624,6 @@ export default function MintPage() {
           const isEligibleForGTD = whitelistData.allowedMintsGTD > 0
           const isEligibleForFCFS = whitelistData.allowedMintsFCFS > 0
           setIsUserEligible(isEligibleForGTD || isEligibleForFCFS)
-
-          console.log("Whitelist data fetched:", whitelistData)
 
           // Fetch contract data
           await fetchContractData(contract, address)
@@ -696,7 +693,7 @@ export default function MintPage() {
 
             // Set mint price based on selected category
             if (phase.categories.length > selectedCategory) {
-              const categoryPrice = ethers.formatEther(phase.categories[selectedCategory].price)
+              const categoryPrice = ethers.formatEther(phase.categories[selectedCategory].price.toString())
               setMintPrice(`${categoryPrice} HYPE`)
             }
           }
@@ -765,7 +762,7 @@ export default function MintPage() {
 
   // Increment mint amount
   const incrementMintAmount = () => {
-    if (phaseInfo.categories && phaseInfo.categories.length > selectedCategory) {
+    if (userPhaseInfo.categories && userPhaseInfo.categories.length > selectedCategory) {
       const maxMint = userPhaseInfo.categories[selectedCategory].maxMintPerWallet
       const userMinted = userPhaseInfo.categories[selectedCategory]?.mintedCount || 0
       const remaining = maxMint - userMinted
@@ -785,7 +782,7 @@ export default function MintPage() {
 
   // Get remaining mints for the selected category
   const getRemainingMints = () => {
-    if (phaseInfo.categories && phaseInfo.categories.length > selectedCategory) {
+    if (userPhaseInfo.categories && userPhaseInfo.categories.length > selectedCategory) {
       return userPhaseInfo.categories[selectedCategory]?.remainingMints || 0
     }
     return 0
@@ -798,7 +795,7 @@ export default function MintPage() {
       isPhaseActive() &&
       getRemainingMints() > 0 &&
       // For GTD and FCFS phases, check if user is eligible
-      (phaseIndex >= 2 || isUserEligible)
+      ((phaseIndex >= 0 && phaseIndex <= 2) || isUserEligible)
     )
   }
 
@@ -1009,7 +1006,7 @@ export default function MintPage() {
                       <p className="text-yellow-300">This mint phase has ended</p>
                     ) : !isUserEligible && phaseIndex < 2 ? (
                       <p className="text-yellow-300">You are not eligible for this mint phase</p>
-                    ) : userPhaseInfo.categories[selectedCategory].maxMintPerWallet <= 0 ? (
+                    ) : userPhaseInfo?.categories?.[selectedCategory]?.maxMintPerWallet <= 0 ? (
                       <p className="text-yellow-300">You are not eligible for this phase</p>
                     ) : getRemainingMints() <= 0 ? (
                       <p className="text-yellow-300">You have reached your mint limit for this category</p>
@@ -1020,7 +1017,7 @@ export default function MintPage() {
                 )}
 
                 {/* Surprise Degen Mint Button - Only show if user is eligible */}
-                {showDegenSurprise && isUserEligible && userPhaseInfo.categories[selectedCategory].maxMintPerWallet > 0 && (
+                {showDegenSurprise && isUserEligible && userPhaseInfo?.categories?.[selectedCategory]?.remainingMints === 0 && (
                   <div className="mt-6 border-t border-white/10 pt-6">
                     {!isDegenRevealed ? (
                       <button
