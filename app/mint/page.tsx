@@ -101,6 +101,32 @@ export default function MintPage() {
     contractInitialized: false,
   })
 
+  const initConnection = async (provider: ethers.BrowserProvider, accounts: any) => {
+    const address = accounts[0]
+    setWalletAddress(address)
+    setIsConnected(true)
+    setProvider(provider)
+
+    // Initialize contract
+    const contract = await getContract(provider)
+    setContract(contract)
+
+    // Store the wallet address for future use
+    storeWalletAddress(address)
+
+    // Fetch whitelist data from our new API
+    const whitelistData = await fetchWhitelistData(address)
+    setWhitelistData(whitelistData)
+
+    // Set user eligibility based on whitelist data
+    const isEligibleForGTD = whitelistData.allowedMintsGTD > 0
+    const isEligibleForFCFS = whitelistData.allowedMintsFCFS > 0
+    setIsUserEligible(isEligibleForGTD || isEligibleForFCFS)
+
+    // Fetch contract data
+    await fetchContractData(contract, address)
+  }
+
   // Connect wallet function
   const connectWallet = async () => {
     setIsConnecting(true)
@@ -112,29 +138,7 @@ export default function MintPage() {
         const accounts = await provider.send("eth_requestAccounts", [])
 
         if (accounts.length > 0) {
-          const address = accounts[0]
-          setWalletAddress(address)
-          setIsConnected(true)
-          setProvider(provider)
-
-          // Initialize contract
-          const contract = await getContract(provider)
-          setContract(contract)
-
-          // Store wallet address in localStorage for persistence
-          storeWalletAddress(address)
-
-          // Fetch whitelist data from our new API
-          const whitelistData = await fetchWhitelistData(address)
-          setWhitelistData(whitelistData)
-
-          // Set user eligibility based on whitelist data
-          const isEligibleForGTD = whitelistData.allowedMintsGTD > 0
-          const isEligibleForFCFS = whitelistData.allowedMintsFCFS > 0
-          setIsUserEligible(isEligibleForGTD || isEligibleForFCFS)
-
-          // Fetch contract data
-          await fetchContractData(contract, address)
+          initConnection(provider, accounts)
         }
       } else {
         setError("No Ethereum wallet detected. Please install MetaMask.")
@@ -604,30 +608,7 @@ export default function MintPage() {
         const accounts = await provider.send("eth_accounts", [])
 
         if (accounts.length > 0) {
-          const address = accounts[0]
-          setWalletAddress(address)
-          setIsConnected(true)
-          setProvider(provider)
-
-          // Initialize contract
-          const contract = await getContract(provider)
-          setContract(contract)
-
-          // Store the wallet address for future use
-          storeWalletAddress(address)
-
-          // Fetch whitelist data from our new API
-          const whitelistData = await fetchWhitelistData(address)
-          setWhitelistData(whitelistData)
-
-          // Set user eligibility based on whitelist data
-          const isEligibleForGTD = whitelistData.allowedMintsGTD > 0
-          const isEligibleForFCFS = whitelistData.allowedMintsFCFS > 0
-          setIsUserEligible(isEligibleForGTD || isEligibleForFCFS)
-
-          // Fetch contract data
-          await fetchContractData(contract, address)
-
+          initConnection(provider, accounts)
           return true
         }
       } catch (err) {
