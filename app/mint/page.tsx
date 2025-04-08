@@ -248,9 +248,26 @@ export default function MintPage() {
         const phase = await getPhaseInfo(contractInstance, currentPhaseIndex)
 
         if (phase) {
+          const whitelistData = await fetchWhitelistData(address)
+          const allowedMintsGTD = whitelistData.allowedMintsGTD
+          const allowedMintsFCFS = whitelistData.allowedMintsFCFS
+
           const categories = await Promise.all(
             phase.categories.map(async (category, idx) => {
-              const maxMintPerWallet = category.maxMintPerWallet
+              let maxMintPerWallet;
+
+              switch (phaseIndex) {
+                case 0:
+                  maxMintPerWallet = allowedMintsGTD;
+                  break;
+                case 1:
+                  maxMintPerWallet = allowedMintsFCFS;
+                  break;
+                case 2:
+                default:
+                  maxMintPerWallet = category.maxMintPerWallet;
+                  break;
+              }
               const mintedCount = await getUserMintedBalance(contractInstance, currentPhaseIndex, idx, address)
               const remainingMints = maxMintPerWallet - mintedCount
 
@@ -262,6 +279,8 @@ export default function MintPage() {
               }
             }),
           )
+
+          console.log(phase)
 
           setUserPhaseInfo({
             categories,
@@ -747,7 +766,7 @@ export default function MintPage() {
   // Increment mint amount
   const incrementMintAmount = () => {
     if (phaseInfo.categories && phaseInfo.categories.length > selectedCategory) {
-      const maxMint = phaseInfo.categories[selectedCategory].maxMintPerWallet
+      const maxMint = userPhaseInfo.categories[selectedCategory].maxMintPerWallet
       const userMinted = userPhaseInfo.categories[selectedCategory]?.mintedCount || 0
       const remaining = maxMint - userMinted
 
@@ -766,7 +785,7 @@ export default function MintPage() {
 
   // Get remaining mints for the selected category
   const getRemainingMints = () => {
-    if (userPhaseInfo.categories && userPhaseInfo.categories.length > selectedCategory) {
+    if (phaseInfo.categories && phaseInfo.categories.length > selectedCategory) {
       return userPhaseInfo.categories[selectedCategory]?.remainingMints || 0
     }
     return 0
@@ -990,6 +1009,8 @@ export default function MintPage() {
                       <p className="text-yellow-300">This mint phase has ended</p>
                     ) : !isUserEligible && phaseIndex < 2 ? (
                       <p className="text-yellow-300">You are not eligible for this mint phase</p>
+                    ) : userPhaseInfo.categories[selectedCategory].maxMintPerWallet <= 0 ? (
+                      <p className="text-yellow-300">You are not eligible for this phase</p>
                     ) : getRemainingMints() <= 0 ? (
                       <p className="text-yellow-300">You have reached your mint limit for this category</p>
                     ) : (
@@ -999,7 +1020,7 @@ export default function MintPage() {
                 )}
 
                 {/* Surprise Degen Mint Button - Only show if user is eligible */}
-                {showDegenSurprise && isUserEligible && (
+                {showDegenSurprise && isUserEligible && userPhaseInfo.categories[selectedCategory].maxMintPerWallet > 0 && (
                   <div className="mt-6 border-t border-white/10 pt-6">
                     {!isDegenRevealed ? (
                       <button
@@ -1054,7 +1075,7 @@ export default function MintPage() {
                         ) : !isPhaseActive() ? (
                           <p className="text-yellow-300 text-center">This mint phase has ended</p>
                         ) : (
-                          <p className="text-yellow-300 text-center">You have already minted your Degen NFT</p>
+                          <p className="text-yellow-300 text-center">You have already minted your Degen allocation</p>
                         )}
                       </div>
                     )}
