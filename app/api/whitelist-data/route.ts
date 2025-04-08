@@ -1,5 +1,8 @@
 import { type NextRequest, NextResponse } from "next/server"
 import { createClient } from "@supabase/supabase-js"
+import { readWhitelistCSV } from "@/lib/utils"
+import path from "path"
+import { generateMerkleProof, generateMerkleTree } from "@/lib/merkle"
 
 // Initialize Supabase client
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || ""
@@ -8,25 +11,47 @@ const supabase = createClient(supabaseUrl, supabaseServiceKey)
 
 export async function POST(request: NextRequest) {
   try {
-    const { walletAddress, fetchAll } = await request.json()
+    const { walletAddress, getProofOnly, phaseIndex } = await request.json()
 
-    // If fetchAll is true, return all whitelist data for Merkle tree generation
-    if (fetchAll) {
-      const { data, error } = await supabase
-        .from("master_hype_evm_wallet_mint_details")
-        .select("address, allowedMintsGTD, allowedMintsFCFS")
-        .not("allowedMintsGTD", "eq", 0)
-        .not("allowedMintsFCFS", "eq", 0)
-
-      if (error) {
-        console.error("Database query error:", error)
-        return NextResponse.json({ error: "Failed to fetch whitelist data" }, { status: 500 })
+    // If getProofOnly is true, return only the merkle proof
+    if (getProofOnly) {
+      try {
+        const filePath = path.join(process.cwd(), "files", "eligibles.csv")
+        const { GTDEntries, FCFSEntries } = readWhitelistCSV(filePath)
+  
+        const selectedEntries =
+          phaseIndex === 0 ? GTDEntries : FCFSEntries
+  
+        const filteredEntries = selectedEntries.filter(
+          (entry) => entry.allowedMints > 0,
+        )
+  
+        const userEntry = filteredEntries.find(
+          (entry) => entry.address.toLowerCase() === walletAddress.toLowerCase()
+        )
+  
+        if (!userEntry) {
+          return NextResponse.json(
+            { error: "Wallet not found in whitelist" },
+            { status: 404 }
+          )
+        }
+  
+        const merkleTree = generateMerkleTree(filteredEntries)
+        const proof = generateMerkleProof(userEntry, merkleTree)
+  
+        return NextResponse.json({
+          address: userEntry.address,
+          allowedMints: userEntry.allowedMints,
+          merkleProof: proof,
+        })
+      } catch (error) {
+        console.error("Error generating Merkle proof:", error)
+        return NextResponse.json(
+          { error: "Failed to generate Merkle proof" },
+          { status: 500 }
+        )
       }
-
-      // Return all whitelist data
-      return NextResponse.json({
-        allWhitelistData: data || [],
-      })
     }
 
     // Otherwise, fetch data for a specific wallet

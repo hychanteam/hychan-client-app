@@ -25,10 +25,11 @@ import {
   getDegenMintInfo,
   fetchWhitelistData,
   WhitelistData,
-  fetchAllWhitelistData,
+  fetchMerkleProof,
+  UserMintInfo,
+  handleCustomContractError,
 } from "../../lib/contract"
 import { FaDiscord } from "react-icons/fa"
-import { generateMerkleProof, generateMerkleTree } from "@/lib/merkle"
 
 export default function MintPage() {
   // Loading state
@@ -84,13 +85,9 @@ export default function MintPage() {
   const [showDegenSurprise, setShowDegenSurprise] = useState<boolean>(false)
   const [isDegenRevealed, setIsDegenRevealed] = useState<boolean>(false)
   const [isUserEligible, setIsUserEligible] = useState<boolean>(false)
-  const [userAllowances, setUserAllowances] = useState({
-    gtdAllowance: 0,
-    fcfsAllowance: 0,
-  })
   const [whitelistData, setWhitelistData] = useState<WhitelistData | null>(null)
   // Add a new state variable for all whitelist data
-  const [allWhitelistData, setAllWhitelistData] = useState<{ address: string; allowedMints: number }[]>([])
+  const [userMintInfo, setUserMintInfo] = useState<UserMintInfo | null>(null)
 
   // Discord state
   const [discordId, setDiscordId] = useState<string | null>(null)
@@ -136,36 +133,7 @@ export default function MintPage() {
           const isEligibleForFCFS = whitelistData.allowedMintsFCFS > 0
           setIsUserEligible(isEligibleForGTD || isEligibleForFCFS)
 
-          // Store the allowance values for merkle proof
-          setUserAllowances({
-            gtdAllowance: whitelistData.allowedMintsGTD || 0,
-            fcfsAllowance: whitelistData.allowedMintsFCFS || 0,
-          })
-
           console.log("Whitelist data fetched:", whitelistData)
-
-          // Fetch user data using link-wallet-discord API
-          try {
-            const discordCreds = getDiscordCredentials()
-            const response = await fetch("/api/link-wallet-discord", {
-              method: "POST",
-              headers: {
-                "Content-Type": "application/json",
-              },
-              body: JSON.stringify({
-                walletAddress: address,
-                discordId: discordCreds?.id || null,
-                discordUsername: discordCreds?.username || null,
-              }),
-            })
-
-            if (response.ok) {
-              const data = await response.json()
-              console.log("Discord data fetched:", data)
-            }
-          } catch (apiError) {
-            console.error("Discord API error:", apiError)
-          }
 
           // Fetch contract data
           await fetchContractData(contract, address)
@@ -241,7 +209,7 @@ export default function MintPage() {
       // Get current phase index
       const currentPhaseIndex = await getCurrentPhaseIndex(contractInstance)
       setPhaseIndex(currentPhaseIndex)
-
+      
       // Get phase info
       if (currentPhaseIndex >= 0) {
         const phase = await getPhaseInfo(contractInstance, currentPhaseIndex)
@@ -315,21 +283,23 @@ export default function MintPage() {
       }
 
       return true
-    } catch (error) {
+    } catch (error: any) {
+      handleCustomContractError(error)
       console.error("Error fetching contract data:", error)
       return false
     }
   }
 
   // Add a function to fetch all whitelist data
-  const fetchAllWhitelistDataForMerkleTree = async (phaseIdx: number) => {
+  const fetchUserMintInfo = async (phaseIdx: number) => {
     try {
-      const data = await fetchAllWhitelistData(phaseIdx)
-      setAllWhitelistData(data)
+      const data = await fetchMerkleProof(walletAddress, phaseIdx)
+
+      setUserMintInfo(data)
       return data
     } catch (error) {
       console.error("Error fetching all whitelist data:", error)
-      return []
+      return null
     }
   }
 
@@ -382,23 +352,12 @@ export default function MintPage() {
         }
 
         // If we don't have all whitelist data yet, fetch it
-        let whitelistForMerkle = allWhitelistData
-        if (whitelistForMerkle.length === 0) {
-          whitelistForMerkle = await fetchAllWhitelistDataForMerkleTree(phaseIndex)
+        let mintingInfo = userMintInfo
+        if (!mintingInfo) {
+          mintingInfo = await fetchUserMintInfo(phaseIndex)
         }
 
-        // Generate merkle tree using all whitelist data
-        const merkleTree = generateMerkleTree(whitelistForMerkle)
-
-        // Generate merkle proof using all whitelist data
-        merkleProof = generateMerkleProof(
-          {
-            address: walletAddress,
-            allowedMints: allowedMints,
-          }, 
-          merkleTree
-        )
-        console.log("Generated merkle proof:", merkleProof)
+        merkleProof = mintingInfo?.merkleProof || [""]
       } else {
         // For public mint (phase 2), no merkle proof is needed
         allowedMints = phaseInfo.categories[selectedCategory].maxMintPerWallet
@@ -410,18 +369,22 @@ export default function MintPage() {
       const totalPrice = ethers.getBigInt(price) * BigInt(mintAmount)
 
       // Execute the mint transaction
-      const tx = await contractWithSigner.safeMint(mintAmount, allowedMints, selectedCategory, merkleProof, {
-        value: totalPrice,
-      })
-
-      // Wait for transaction to be mined
-      await tx.wait()
+      const tx = await contractWithSigner.safeMint(
+        mintAmount,
+        allowedMints,
+        selectedCategory,
+        merkleProof,
+        { value: totalPrice }
+      );
+      await tx.wait();
 
       setSuccess(`Successfully minted ${mintAmount} HYCHAN NFT${mintAmount > 1 ? "s" : ""}!`)
 
       // Refresh data after successful mint
       setRefreshCounter((prev) => prev + 1)
+      
     } catch (err: any) {
+      handleCustomContractError(err)
       console.error("Error minting:", err)
 
       // Extract error message from blockchain error
@@ -490,6 +453,7 @@ export default function MintPage() {
       // Refresh data after successful mint
       setRefreshCounter((prev) => prev + 1)
     } catch (err: any) {
+      handleCustomContractError(err)
       console.error("Error minting degen:", err)
 
       // Extract error message from blockchain error
@@ -560,7 +524,7 @@ export default function MintPage() {
       const currentPhaseIdx = await getCurrentPhaseIndex(contract)
       if (currentPhaseIdx >= 0 && currentPhaseIdx < 2) {
         // Only for GTD and FCFS phases
-        await fetchAllWhitelistDataForMerkleTree(currentPhaseIdx)
+        await fetchUserMintInfo(currentPhaseIdx)
       }
     }
     setLoadingProgress(90)
@@ -597,36 +561,7 @@ export default function MintPage() {
       const isEligibleForFCFS = whitelistData.allowedMintsFCFS > 0
       setIsUserEligible(isEligibleForGTD || isEligibleForFCFS)
 
-      // Store the allowance values for merkle proof
-      setUserAllowances({
-        gtdAllowance: whitelistData.allowedMintsGTD || 0,
-        fcfsAllowance: whitelistData.allowedMintsFCFS || 0,
-      })
-
       console.log("Whitelist data fetched from stored address:", whitelistData)
-
-      // Fetch user data using the stored address with link-wallet-discord API
-      try {
-        const discordCreds = getDiscordCredentials()
-        const response = await fetch("/api/link-wallet-discord", {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({
-            walletAddress: storedAddress,
-            discordId: discordCreds?.id || null,
-            discordUsername: discordCreds?.username || null,
-          }),
-        })
-
-        if (response.ok) {
-          const data = await response.json()
-          console.log("Discord data fetched:", data)
-        }
-      } catch (apiError) {
-        console.error("Discord API error:", apiError)
-      }
 
       // Also set up provider if window.ethereum is available
       if (window.ethereum) {
@@ -672,36 +607,7 @@ export default function MintPage() {
           const isEligibleForFCFS = whitelistData.allowedMintsFCFS > 0
           setIsUserEligible(isEligibleForGTD || isEligibleForFCFS)
 
-          // Store the allowance values for merkle proof
-          setUserAllowances({
-            gtdAllowance: whitelistData.allowedMintsGTD || 0,
-            fcfsAllowance: whitelistData.allowedMintsFCFS || 0,
-          })
-
           console.log("Whitelist data fetched:", whitelistData)
-
-          // Fetch user data using link-wallet-discord API
-          try {
-            const discordCreds = getDiscordCredentials()
-            const response = await fetch("/api/link-wallet-discord", {
-              method: "POST",
-              headers: {
-                "Content-Type": "application/json",
-              },
-              body: JSON.stringify({
-                walletAddress: address,
-                discordId: discordCreds?.id || null,
-                discordUsername: discordCreds?.username || null,
-              }),
-            })
-
-            if (response.ok) {
-              const data = await response.json()
-              console.log("Discord data fetched:", data)
-            }
-          } catch (apiError) {
-            console.error("Discord API error:", apiError)
-          }
 
           // Fetch contract data
           await fetchContractData(contract, address)
@@ -964,7 +870,7 @@ export default function MintPage() {
           <div className="w-full max-w-md bg-teal-900/60 backdrop-blur-sm p-6 rounded-lg border border-white/10 mb-8">
             {/* Phase Info */}
             <div className="mb-6">
-              <h2 className="text-xl font-bold mb-2">{phaseInfo.phaseName}</h2>
+              <h2 className="text-xl mb-2">{phaseInfo.phaseName}</h2>
 
               {phaseInfo.phaseIndex >= 0 && (
                 <div className="flex justify-between items-center text-sm">
@@ -1078,7 +984,9 @@ export default function MintPage() {
                   </div>
                 ) : (
                   <div className="text-center py-2">
-                    {!isPhaseActive() ? (
+                    {phaseIndex === -1 ? (
+                      <p className="text-yellow-300">The minting is paused</p>
+                    ) : !isPhaseActive() ? (
                       <p className="text-yellow-300">This mint phase has ended</p>
                     ) : !isUserEligible && phaseIndex < 2 ? (
                       <p className="text-yellow-300">You are not eligible for this mint phase</p>

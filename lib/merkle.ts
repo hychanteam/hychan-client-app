@@ -28,7 +28,7 @@ export function generateMerkleProof(
           Buffer.from(entry.allowedMints.toString(16).padStart(64, "0"), "hex"), // 32-byte uint256
       ])
   );
-
+  
   // Get Merkle proof
   const proof = merkleTree.getHexProof(leaf);
   return proof;

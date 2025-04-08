@@ -1,4 +1,4 @@
-import { ethers } from "ethers"
+import { ethers, Interface } from "ethers"
 import abiJson from "../abi.json" assert { type: "json" }; 
 
 // Contract address - replace with your actual contract address
@@ -6,6 +6,8 @@ const CONTRACT_ADDRESS = process.env.NEXT_PUBLIC_CONTRACT_ADDRESS || ""
 
 // Contract ABI for the functions we need
 const contractABI = abiJson.abi
+
+export const iface = new Interface(contractABI);
 
 // Interface for MintCategory
 export interface MintCategory {
@@ -34,13 +36,11 @@ export interface WhitelistData {
   isWhitelisted: boolean
 }
 
-// Interface for all whitelist data
-export interface AllWhitelistData {
-  allWhitelistData: {
-    address: string
-    allowedMintsGTD: number
-    allowedMintsFCFS: number
-  }[]
+// Interface for user mint info
+export interface UserMintInfo {
+  address: string,
+  allowedMints: number,
+  merkleProof: string[],
 }
 
 // Function to get the contract instance
@@ -62,6 +62,7 @@ export const getCurrentPhaseIndex = async (contract: ethers.Contract): Promise<n
     const phaseIndex = await contract.phaseIndex()
     return Number(phaseIndex)
   } catch (error) {
+    handleCustomContractError(error)
     console.error("Error getting phase index:", error)
     return -1
   }
@@ -87,6 +88,7 @@ export const getPhaseInfo = async (contract: ethers.Contract, phaseIndex: number
       })),
     }
   } catch (error) {
+    handleCustomContractError(error)
     console.error("Error getting phase info:", error)
     return null
   }
@@ -105,6 +107,7 @@ export const getSupplyInfo = async (contract: ethers.Contract) => {
       remainingSupply: Number(remainingSupply),
     }
   } catch (error) {
+    handleCustomContractError(error)
     console.error("Error getting supply info:", error)
     return {
       maxSupply: 0,
@@ -125,6 +128,7 @@ export const getUserMintedBalance = async (
     const balance = await contract.addressMintedBalance(phaseIndex, categoryIndex, address)
     return Number(balance)
   } catch (error) {
+    handleCustomContractError(error)
     console.error("Error getting user minted balance:", error)
     return 0
   }
@@ -136,6 +140,7 @@ export const getUserDegenMintedCount = async (contract: ethers.Contract, address
     const count = await contract.degenMintedCount(address)
     return Number(count)
   } catch (error) {
+    handleCustomContractError(error)
     console.error("Error getting user degen minted count:", error)
     return 0
   }
@@ -151,6 +156,7 @@ export const getCategoryMintedCount = async (
     const count = await contract.categoryMintedCount(phaseIndex, categoryIndex)
     return Number(count)
   } catch (error) {
+    handleCustomContractError(error)
     console.error("Error getting category minted count:", error)
     return 0
   }
@@ -178,6 +184,7 @@ export const getDegenMintInfo = async (
       price: degenCost,
     }
   } catch (error) {
+    handleCustomContractError(error)
     console.error("Error getting degen mint info:", error)
     return {
       mintedCount: 0,
@@ -216,35 +223,39 @@ export const fetchWhitelistData = async (walletAddress: string): Promise<Whiteli
   }
 }
 
-// Function to fetch all whitelist data for Merkle tree generation
-export const fetchAllWhitelistData = async (
+// Function to fetch address merkle proof whitelist data for Merkle tree generation
+export const fetchMerkleProof = async (
+  walletAddress: string,
   phaseIndex: number,
-): Promise<{ address: string; allowedMints: number }[]> => {
+): Promise<UserMintInfo | null> => {
   try {
     const response = await fetch("/api/whitelist-data", {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
       },
-      body: JSON.stringify({ fetchAll: true }),
+      body: JSON.stringify({ walletAddress: walletAddress, getProofOnly: true, phaseIndex: phaseIndex }),
     })
 
     if (!response.ok) {
       throw new Error(`API error: ${response.status}`)
     }
 
-    const data: AllWhitelistData = await response.json()
-
-    // Transform the data based on the phase
-    return data.allWhitelistData
-      .map((item) => ({
-        address: item.address,
-        // For GTD phase (0), use GTD allowance, for FCFS phase (1), use FCFS allowance
-        allowedMints: phaseIndex === 0 ? item.allowedMintsGTD : item.allowedMintsFCFS,
-      }))
-      .filter((item) => item.allowedMints > 0) // Only include entries with allowance > 0
+    const data: UserMintInfo = await response.json()
+    return data
   } catch (error) {
     console.error("Error fetching all whitelist data:", error)
-    return []
+    return null
+  }
+}
+
+export const handleCustomContractError = (error: any) =>{
+  if (error.data) {
+    try {
+      const decodedError = iface.parseError(error.data);
+      console.error("Decoded custom error:", decodedError);
+    } catch (decodeError) {
+      console.warn("Failed to decode custom error:", decodeError);
+    }
   }
 }
