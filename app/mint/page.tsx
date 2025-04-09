@@ -80,7 +80,7 @@ export default function MintPage() {
     price: ethers.parseEther("3"),
   })
   const [timeRemaining, setTimeRemaining] = useState<string>("")
-  const [mintPrice, setMintPrice] = useState<string>("2 HYPE")
+  const [mintPrice, setMintPrice] = useState<string>("2.0 HYPE")
   const [refreshCounter, setRefreshCounter] = useState<number>(0)
   const [selectedCategory, setSelectedCategory] = useState<number>(0)
   const [showDegenSurprise, setShowDegenSurprise] = useState<boolean>(false)
