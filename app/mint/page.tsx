@@ -71,6 +71,7 @@ export default function MintPage() {
   const [userPhaseInfo, setUserPhaseInfo] = useState<any>({
     categories: [],
     hasFullyMinted: false,
+    isUserEligibleInCurrentPhase: false,
   })
   const [degenMintInfo, setDegenMintInfo] = useState<any>({
     mintedCount: 0,
@@ -84,7 +85,6 @@ export default function MintPage() {
   const [selectedCategory, setSelectedCategory] = useState<number>(0)
   const [showDegenSurprise, setShowDegenSurprise] = useState<boolean>(false)
   const [isDegenRevealed, setIsDegenRevealed] = useState<boolean>(false)
-  const [isUserEligible, setIsUserEligible] = useState<boolean>(false)
   const [whitelistData, setWhitelistData] = useState<WhitelistData | null>(null)
   // Add a new state variable for all whitelist data
   const [userMintInfo, setUserMintInfo] = useState<UserMintInfo | null>(null)
@@ -121,7 +121,10 @@ export default function MintPage() {
     // Set user eligibility based on whitelist data
     const isEligibleForGTD = whitelistData.allowedMintsGTD > 0
     const isEligibleForFCFS = whitelistData.allowedMintsFCFS > 0
-    setIsUserEligible(isEligibleForGTD || isEligibleForFCFS)
+    setUserPhaseInfo({
+      ...userPhaseInfo,
+      isUserEligibleInCurrentPhase: phaseIndex === 0 ? isEligibleForGTD : phaseIndex === 1 ? isEligibleForFCFS : true
+    })
 
     // Fetch contract data
     await fetchContractData(contract, address)
@@ -160,6 +163,7 @@ export default function MintPage() {
     setUserPhaseInfo({
       categories: [],
       hasFullyMinted: false,
+      isUserEligibleInCurrentPhase: false
     })
     setDegenMintInfo({
       mintedCount: 0,
@@ -169,7 +173,7 @@ export default function MintPage() {
     })
     setShowDegenSurprise(false)
     setIsDegenRevealed(false)
-    setIsUserEligible(false)
+
     setWhitelistData(null)
 
     // Clear stored wallet address
@@ -285,12 +289,13 @@ export default function MintPage() {
           setUserPhaseInfo({
             categories,
             hasFullyMinted: categories.every((cat) => cat.remainingMints <= 0),
+            isUserEligibleInCurrentPhase: phaseIndex === 0 ? allowedMintsGTD > 0 : phaseIndex === 1 ? allowedMintsFCFS > 0 : true
           })
 
           // Set user eligibility based on whitelist data
           const isEligibleForGTD = allowedMintsGTD > 0
           const isEligibleForFCFS = allowedMintsFCFS > 0
-          const isUserEligible = (isEligibleForGTD || isEligibleForFCFS)
+          const isUserEligible = phaseIndex === 0 ? isEligibleForGTD : phaseIndex === 1 ? isEligibleForFCFS : true
 
           // Check if user has fully minted to show degen option
           // Only show degen mint if user is eligible (has mintAmounts from database)
@@ -350,7 +355,9 @@ export default function MintPage() {
 
       // For GTD and FCFS phases, we need to check eligibility and generate merkle proofs
       if (phaseIndex < 2) {
-        if (!isUserEligible) {
+        console.log(phaseInfo)
+        console.log(userPhaseInfo)
+        if (!userPhaseInfo.isUserEligibleInCurrentPhase) {
           throw new Error("NotEligible: You are not eligible for this mint phase")
         }
 
@@ -389,7 +396,7 @@ export default function MintPage() {
 
       // Calculate price
       const category = phaseInfo.categories[selectedCategory]
-      const price = category.price
+      const price = category.price.toString()
       const totalPrice = ethers.getBigInt(price) * BigInt(mintAmount)
 
       // Execute the mint transaction
@@ -455,7 +462,7 @@ export default function MintPage() {
       }
 
       // Check if user is eligible for degen mint (must be eligible for regular mint)
-      if (!isUserEligible) {
+      if (!userPhaseInfo.isUserEligibleInCurrentPhase) {
         throw new Error("NotEligible: You are not eligible for degen mint")
       }
 
@@ -583,7 +590,10 @@ export default function MintPage() {
       // Set user eligibility based on whitelist data
       const isEligibleForGTD = whitelistData.allowedMintsGTD > 0
       const isEligibleForFCFS = whitelistData.allowedMintsFCFS > 0
-      setIsUserEligible(isEligibleForGTD || isEligibleForFCFS)
+      setUserPhaseInfo({
+        ...userPhaseInfo,
+        isUserEligibleInCurrentPhase: phaseIndex === 0 ? isEligibleForGTD : phaseIndex === 1 ? isEligibleForFCFS : true
+      })
 
       // Also set up provider if window.ethereum is available
       if (window.ethereum) {
@@ -727,12 +737,12 @@ export default function MintPage() {
 
   // Effect to check if user has fully minted and show degen surprise
   useEffect(() => {
-    if (userPhaseInfo.hasFullyMinted && isUserEligible) {
+    if (userPhaseInfo.hasFullyMinted && userPhaseInfo.isUserEligibleInCurrentPhase) {
       setShowDegenSurprise(true)
     } else {
       setShowDegenSurprise(false)
     }
-  }, [userPhaseInfo.hasFullyMinted, isUserEligible])
+  }, [userPhaseInfo.hasFullyMinted, userPhaseInfo.isUserEligibleInCurrentPhase])
 
   // Effect for fetching contract data when refreshCounter changes
   useEffect(() => {
@@ -776,7 +786,7 @@ export default function MintPage() {
       isPhaseActive() &&
       getRemainingMints() > 0 &&
       // For GTD and FCFS phases, check if user is eligible
-      ((phaseIndex >= 0 && phaseIndex <= 2) || isUserEligible)
+      ((phaseIndex >= 0 && phaseIndex <= 2) || userPhaseInfo.isUserEligibleInCurrentPhase)
     )
   }
 
@@ -985,7 +995,7 @@ export default function MintPage() {
                       <p className="text-yellow-300">The minting is paused</p>
                     ) : !isPhaseActive() ? (
                       <p className="text-yellow-300">This mint phase has ended</p>
-                    ) : !isUserEligible && phaseIndex < 2 ? (
+                    ) : !userPhaseInfo.isUserEligibleInCurrentPhase && phaseIndex < 2 ? (
                       <p className="text-yellow-300">You are not eligible for this mint phase</p>
                     ) : userPhaseInfo?.categories?.[selectedCategory]?.maxMintPerWallet <= 0 ? (
                       <p className="text-yellow-300">You are not eligible for this phase</p>
@@ -998,7 +1008,7 @@ export default function MintPage() {
                 )}
 
                 {/* Surprise Degen Mint Button - Only show if user is eligible */}
-                {showDegenSurprise && isUserEligible && userPhaseInfo?.categories?.[selectedCategory]?.remainingMints === 0 && (
+                {showDegenSurprise && userPhaseInfo.isUserEligibleInCurrentPhase && userPhaseInfo?.categories?.[selectedCategory]?.remainingMints === 0 && (
                   <div className="mt-6 border-t border-white/10 pt-6">
                     {!isDegenRevealed ? (
                       <button
