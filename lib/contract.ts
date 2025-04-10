@@ -173,7 +173,7 @@ export const getDegenMintInfo = async (
   price: ethers.BigNumberish
 }> => {
   try {
-    const mintedCount = await contract.degenMintedCount(address)
+    const mintedCount = await contract.degenMintedCount()
     const maxMintPerWallet = await contract.maxDegenMintPerWallet()
     const degenCost = await contract.degenCost()
 
