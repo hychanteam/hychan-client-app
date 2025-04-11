@@ -459,7 +459,7 @@ export default function Home() {
           <div className="w-32 md:w-40"/>
           
           {/* Navbar buttons - hidden on mobile */}
-          <div className="hidden md:flex gap-2">
+          <div className="flex gap-2">
             {isConnected ? (
               <button
                 onClick={disconnectWallet}
@@ -497,10 +497,12 @@ export default function Home() {
             {discordId && (
               <button
                 onClick={disconnectDiscord}
-                className="bg-indigo-600 hover:bg-indigo-700 text-white py-2 px-4 rounded-[8px] transition-colors flex items-center"
+                className="bg-indigo-600 hover:bg-indigo-700 text-white py-2 px-4 rounded-md transition-colors flex items-center max-w-[150px]"
               >
-                <FaDiscord size={24} className="mr-2" />
-                {discordUsername || "Discord"}
+                <FaDiscord size={24} className="mr-2 shrink-0" />
+                <span className="truncate whitespace-nowrap overflow-hidden">
+                  {discordUsername || "Discord"}
+                </span>
               </button>
             )}
           </div>
@@ -563,13 +565,13 @@ export default function Home() {
 
           <div className="flex flex-col sm:flex-row gap-4 mt-0">
             <Link href="/mint">
-              <button className="bg-teal-400 hover:bg-teal-300 text-white py-3 px-12 rounded-md text-2xl font-medium tracking-wider transition-colors">
+              <button className="w-64 bg-teal-400 hover:bg-teal-300 text-white py-3 rounded-md text-2xl font-medium tracking-wider transition-colors">
                 Enter The Arena
               </button>
             </Link>
 
             <Link href="/check-wallet">
-              <button className="bg-transparent border border-white/30 hover:bg-white/10 text-white py-3 px-12 rounded-md text-2xl font-medium tracking-wider transition-colors">
+              <button className="w-64 bg-transparent border border-white/30 hover:bg-white/10 text-white py-3 rounded-md text-2xl font-medium tracking-wider transition-colors">
                 Check Wallet
               </button>
             </Link>

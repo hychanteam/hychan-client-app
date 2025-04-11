@@ -811,12 +811,14 @@ export default function MintPage() {
 
       <div className="container mx-auto px-4 py-6 flex-1 flex flex-col relative z-10">
         <header className="flex justify-between items-center h-12">
-          <Link href="/" className="flex items-center text-white hover:text-teal-300 transition-colors">
-            <ArrowLeft className="mr-2" size={20} />
-            <span>Back to Home</span>
-          </Link>
+        <Link href="/" className="flex items-center text-white hover:text-teal-300 transition-colors">
+          <ArrowLeft className="mr-2" size={20} />
+          <span>
+            <span className="hidden md:inline">Back to Home</span>
+          </span>
+        </Link>
 
-          <div className="hidden md:flex gap-2">
+          <div className="flex gap-2">
             {/* Wallet Connect Button */}
             {isConnected ? (
               <button
@@ -846,10 +848,12 @@ export default function MintPage() {
             {discordId ? (
               <button
                 onClick={disconnectDiscord}
-                className="bg-indigo-600 hover:bg-indigo-700 text-white py-2 px-4 rounded-md transition-colors flex items-center"
+                className="bg-indigo-600 hover:bg-indigo-700 text-white py-2 px-4 rounded-md transition-colors flex items-center max-w-[150px]"
               >
-                <FaDiscord size={24} className="mr-2" />
-                {discordUsername || "Discord"}
+                <FaDiscord size={24} className="mr-2 shrink-0" />
+                <span className="truncate whitespace-nowrap overflow-hidden">
+                  {discordUsername || "Discord"}
+                </span>
               </button>
             ) : (
               <button
