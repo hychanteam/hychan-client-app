@@ -481,7 +481,7 @@ export default function Home() {
                     Connecting...
                   </>
                 ) : (
-                  "Connect Wallet"
+                  "Connect"
                 )}
               </button>
             )}

@@ -419,7 +419,7 @@ export default function CheckWallet() {
                     Connecting...
                   </>
                 ) : (
-                  "Connect Wallet"
+                  "Connect"
                 )}
               </button>
             )}
