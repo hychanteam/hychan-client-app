@@ -395,10 +395,9 @@ export default function CheckWallet() {
         <header className="flex justify-between items-center h-12">
           <Link href="/" className="flex items-center text-white hover:text-teal-300 transition-colors">
             <ArrowLeft className="mr-2" size={20} />
-            <span>Back to Home</span>
           </Link>
 
-          <div className="hidden md:flex gap-2">
+          <div className="flex gap-2">
             {/* Wallet Connect Button */}
             {isConnected ? (
               <button
@@ -426,28 +425,32 @@ export default function CheckWallet() {
             )}
 
             {/* Discord Connect Button */}
-            {discordId ? (
-              <button
-                onClick={disconnectDiscord}
-                className="bg-indigo-600 hover:bg-indigo-700 text-white py-2 px-4 rounded-md transition-colors flex items-center"
-              >
-                <FaDiscord size={24} className="mr-2" />
-                {discordUsername || "Discord"}
-              </button>
-            ) : (
-              <button
-                onClick={connectDiscord}
-                className="bg-indigo-600 hover:bg-indigo-700 text-white py-2 px-4 rounded-md transition-colors flex items-center"
-              >
-                <FaDiscord size={24} className="mr-2" />
-                Connect
-              </button>
+            {isConnected && (
+              discordId ? (
+                <button
+                  onClick={disconnectDiscord}
+                  className="bg-indigo-600 hover:bg-indigo-700 text-white py-2 px-4 rounded-md transition-colors flex items-center max-w-[150px]"
+                >
+                  <FaDiscord size={24} className="mr-2 shrink-0" />
+                  <span className="truncate whitespace-nowrap overflow-hidden">
+                    {discordUsername || "Discord"}
+                  </span>
+                </button>
+              ) : (
+                <button
+                  onClick={connectDiscord}
+                  className="bg-indigo-600 hover:bg-indigo-700 text-white py-2 px-4 rounded-md transition-colors flex items-center"
+                >
+                  <FaDiscord size={24} className="mr-2" />
+                  Connect
+                </button>
+              )
             )}
           </div>
         </header>
 
         <div className="flex-1 flex flex-col items-center justify-center text-center relative mt-4">
-          <div className="text-4xl md:text-7xl font-bold tracking-wider">
+          <div className="text-4xl md:text-7xl font-bold tracking-wider mb-6">
               <Image
                   src="/assets/images/png/title-large.png"
                   alt="HYCHAN"
@@ -456,8 +459,6 @@ export default function CheckWallet() {
                   className="mx-auto md:w-[300px] md:h-[90px]"
               />
           </div>
-
-          <h1 className="text-3xl md:text-4xl mb-8 mt-6">Wallet Checker</h1>
 
           <div className="w-full max-w-md bg-teal-900/60 backdrop-blur-sm p-6 rounded-lg border border-white/10">
             {/* Error message */}
