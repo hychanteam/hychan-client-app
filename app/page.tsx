@@ -496,7 +496,7 @@ export default function Home() {
               </button>
             )}
 
-            {discordId && (
+            {isConnected && discordId && (
               <button
                 onClick={disconnectDiscord}
                 className="bg-indigo-600 hover:bg-indigo-700 text-white py-2 px-4 rounded-md transition-colors flex items-center max-w-[150px]"
