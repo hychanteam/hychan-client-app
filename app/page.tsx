@@ -116,7 +116,7 @@ export default function Home() {
           }
         } else if (!silent) {
           // Only show this error if not in silent mode
-          setErrorWithTimeout("No Ethereum wallet detected. Please install wallet extensions or In-app wallet Browsers.")
+          setErrorWithTimeout("No Ethereum wallet detected. Please install wallet extensions or In-app wallet browsers.")
         }
         return false // Failed to connect
       } catch (err: unknown) {

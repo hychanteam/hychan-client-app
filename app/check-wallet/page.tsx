@@ -100,7 +100,7 @@ export default function CheckWallet() {
         }
       } else if (!silent) {
         // Only show this error if not in silent mode
-        setError("No Ethereum wallet detected. Please install wallet extensions or In-app wallet Browsers.")
+        setError("No Ethereum wallet detected. Please install wallet extensions or In-app wallet browsers.")
       }
       return false // Failed to connect
     } catch (err: unknown) {
