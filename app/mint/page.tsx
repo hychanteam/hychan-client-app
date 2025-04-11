@@ -844,25 +844,26 @@ export default function MintPage() {
               </button>
             )}
 
-            {/* Discord Connect Button */}
-            {discordId ? (
-              <button
-                onClick={disconnectDiscord}
-                className="bg-indigo-600 hover:bg-indigo-700 text-white py-2 px-4 rounded-md transition-colors flex items-center max-w-[150px]"
-              >
-                <FaDiscord size={24} className="mr-2 shrink-0" />
-                <span className="truncate whitespace-nowrap overflow-hidden">
-                  {discordUsername || "Discord"}
-                </span>
-              </button>
-            ) : (
-              <button
-                onClick={connectDiscord}
-                className="bg-indigo-600 hover:bg-indigo-700 text-white py-2 px-4 rounded-md transition-colors flex items-center"
-              >
-                <FaDiscord size={24} className="mr-2" />
-                Connect
-              </button>
+            {isConnected && (
+              discordId ? (
+                <button
+                  onClick={disconnectDiscord}
+                  className="bg-indigo-600 hover:bg-indigo-700 text-white py-2 px-4 rounded-md transition-colors flex items-center max-w-[150px]"
+                >
+                  <FaDiscord size={24} className="mr-2 shrink-0" />
+                  <span className="truncate whitespace-nowrap overflow-hidden">
+                    {discordUsername || "Discord"}
+                  </span>
+                </button>
+              ) : (
+                <button
+                  onClick={connectDiscord}
+                  className="bg-indigo-600 hover:bg-indigo-700 text-white py-2 px-4 rounded-md transition-colors flex items-center"
+                >
+                  <FaDiscord size={24} className="mr-2" />
+                  Connect
+                </button>
+              )
             )}
           </div>
         </header>
