@@ -77,6 +77,8 @@ export default function MintPage() {
     mintedCount: 0,
     maxMintPerWallet: 1,
     remainingMints: 1,
+    degenTotalSupply: 0,
+    degenMaxSupply: 0,
     price: ethers.parseEther("3"),
   })
   const [timeRemaining, setTimeRemaining] = useState<string>("")
@@ -169,6 +171,8 @@ export default function MintPage() {
       mintedCount: 0,
       maxMintPerWallet: 1,
       remainingMints: 1,
+      degenTotalSupply: 0,
+      degenMaxSupply: 0,
       price: ethers.parseEther("3"),
     })
     setShowDegenSurprise(false)
@@ -225,7 +229,7 @@ export default function MintPage() {
             phaseIndex: currentPhaseIndex,
             phaseName:
               currentPhaseIndex === 0
-                ? "GTD Mint (Phase 1)"
+                ? "OG / GTD Mint (Phase 1)"
                 : currentPhaseIndex === 1
                   ? "FCFS Mint (Phase 2)"
                   : currentPhaseIndex === 2
@@ -670,7 +674,7 @@ export default function MintPage() {
               phaseIndex: currentPhaseIndex,
               phaseName:
                 currentPhaseIndex === 0
-                  ? "GTD Mint (Phase 1)"
+                  ? "OG / GTD Mint (Phase 1)"
                   : currentPhaseIndex === 1
                     ? "FCFS Mint (Phase 2)"
                     : currentPhaseIndex === 2
@@ -1035,6 +1039,20 @@ export default function MintPage() {
                             Congratulations! You've unlocked the special Degen Mint. This is a limited opportunity to
                             mint a rare HYCHAN NFT.
                           </p>
+                          <div className="mt-4 h-2 bg-zinc-800 rounded-full overflow-hidden">
+                            <div
+                              className="h-full bg-fuchsia-500"
+                              style={{
+                                width: `${degenMintInfo.degenMaxSupply > 0 ? (degenMintInfo.degenTotalSupply / degenMintInfo.degenMaxSupply) * 100 : 0}%`,
+                              }}
+                            />
+                          </div>
+                          <div className="flex justify-between items-center text-sm mt-1 mb-2">
+                            <span>
+                              {degenMintInfo.degenTotalSupply} / {degenMintInfo.degenMaxSupply}
+                            </span>
+                            <span>{degenMintInfo.degenMaxSupply - degenMintInfo.degenTotalSupply} remaining</span>
+                          </div>
                           <div className="flex justify-between items-center text-sm mb-2">
                             <span>Price:</span>
                             <span className="font-bold">{ethers.formatEther(degenMintInfo.price)} HYPE</span>
@@ -1105,7 +1123,7 @@ export default function MintPage() {
               <div
                 className={`p-4 rounded-md border ${phaseInfo.phaseIndex === 0 ? "bg-teal-700/60 border-teal-400/50" : "bg-teal-900/40 border-white/10"}`}
               >
-                <h4 className="font-bold">GTD Mint (Phase 1)</h4>
+                <h4 className="font-bold">OG / GTD Mint (Phase 1)</h4>
                 <p className="text-sm opacity-80 mt-1">
                   Guaranteed mint for whitelisted wallets. 2 HYPE per NFT, max 2 per wallet.
                 </p>

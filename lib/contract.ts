@@ -170,17 +170,23 @@ export const getDegenMintInfo = async (
   mintedCount: number
   maxMintPerWallet: number
   remainingMints: number
+  degenTotalSupply: number
+  degenMaxSupply: number
   price: ethers.BigNumberish
 }> => {
   try {
     const mintedCount = await contract.degenAddressMintedCount(address)
     const maxMintPerWallet = await contract.maxDegenMintPerWallet()
     const degenCost = await contract.degenCost()
+    const degenTotalSupply = await contract.degenMintedCount()
+    const degenMaxSupply = await contract.degenAlloc()
 
     return {
       mintedCount: Number(mintedCount),
       maxMintPerWallet: Number(maxMintPerWallet),
       remainingMints: Number(maxMintPerWallet) - Number(mintedCount),
+      degenTotalSupply: Number(degenTotalSupply),
+      degenMaxSupply: Number(degenMaxSupply),
       price: degenCost,
     }
   } catch (error) {
@@ -190,6 +196,8 @@ export const getDegenMintInfo = async (
       mintedCount: 0,
       maxMintPerWallet: 0,
       remainingMints: 0,
+      degenTotalSupply: 0,
+      degenMaxSupply: 1000,
       price: ethers.parseEther("3"),
     }
   }
