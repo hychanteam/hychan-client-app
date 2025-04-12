@@ -303,7 +303,7 @@ export default function MintPage() {
 
           // Check if user has fully minted to show degen option
           // Only show degen mint if user is eligible (has mintAmounts from database)
-          if (categories.every((cat) => cat.remainingMints <= 0) && isUserEligible) {
+          if (categories.every((cat) => cat.remainingMints <= 0) || !isUserEligible) {
             setShowDegenSurprise(true)
 
             // Get degen mint info
@@ -465,11 +465,6 @@ export default function MintPage() {
         throw new Error("PhaseEnded: This mint phase has ended")
       }
 
-      // Check if user is eligible for degen mint (must be eligible for regular mint)
-      if (!userPhaseInfo.isUserEligibleInCurrentPhase) {
-        throw new Error("NotEligible: You are not eligible for degen mint")
-      }
-
       // Get signer for transaction
       const contractWithSigner = await getContractWithSigner(provider)
 
@@ -501,8 +496,6 @@ export default function MintPage() {
           errorMessage = "Degen allocation is sold out"
         } else if (err.message.includes("InsufficientPayment")) {
           errorMessage = "Insufficient payment amount"
-        } else if (err.message.includes("NotEligible")) {
-          errorMessage = "You are not eligible for degen mint"
         } else if (err.message.includes("PhaseEnded")) {
           errorMessage = "This mint phase has ended"
         } else if (err.message.includes("user rejected")) {
@@ -1017,7 +1010,7 @@ export default function MintPage() {
                 )}
 
                 {/* Surprise Degen Mint Button - Only show if user is eligible */}
-                {showDegenSurprise && userPhaseInfo.isUserEligibleInCurrentPhase && userPhaseInfo?.categories?.[selectedCategory]?.remainingMints === 0 && (
+                {(showDegenSurprise && userPhaseInfo.isUserEligibleInCurrentPhase && userPhaseInfo?.categories?.[selectedCategory]?.remainingMints === 0) || !userPhaseInfo.isUserEligibleInCurrentPhase && (
                   <div className="mt-6 border-t border-white/10 pt-6">
                     {!isDegenRevealed ? (
                       <button
@@ -1025,7 +1018,7 @@ export default function MintPage() {
                         className="w-full bg-gradient-to-r from-purple-500 to-pink-500 hover:from-purple-600 hover:to-pink-600 text-white py-3 px-4 rounded-md font-medium transition-colors flex justify-center items-center gap-2"
                       >
                         <Gift className="h-5 w-5" />
-                        Click to see surprise!
+                        Try your luck!
                         <Sparkles className="h-5 w-5" />
                       </button>
                     ) : (
