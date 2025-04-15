@@ -5,7 +5,7 @@ import Link from "next/link"
 import Image from "next/image"
 import { ArrowLeft, Loader2, AlertCircle, CheckCircle2, Gift, Sparkles } from "lucide-react"
 import { ethers } from "ethers"
-import { formatTimeRemaining } from "../../lib/time-utils"
+import { formatTimeRemaining, getTimeTillMinting } from "../../lib/time-utils"
 import {
   getDiscordAuthUrl,
   storeWalletAddress,
@@ -32,12 +32,15 @@ import {
 import { FaDiscord } from "react-icons/fa"
 
 export default function MintPage() {
+  const mintStartTime = new Date("2025-04-26T17:00:00Z"); // 5PM UTC
+  
   // Loading state
   const [isLoading, setIsLoading] = useState(true)
   const [loadingProgress, setLoadingProgress] = useState(0)
   const [loadingMessage, setLoadingMessage] = useState("Initializing...")
 
   // State variables
+  const [timeLeft, setTimeLeft] = useState(getTimeTillMinting(mintStartTime));
   const [walletAddress, setWalletAddress] = useState<string>("")
   const [isConnected, setIsConnected] = useState<boolean>(false)
   const [isConnecting, setIsConnecting] = useState<boolean>(false)
@@ -56,8 +59,8 @@ export default function MintPage() {
     active: boolean
     categories: any[]
   }>({
-    phaseIndex: -1,
-    phaseName: "Minting Paused",
+    phaseIndex: -2,
+    phaseName: "Please Wait",
     startTime: 0,
     endTime: 0,
     active: false,
@@ -228,13 +231,15 @@ export default function MintPage() {
           setPhaseInfo({
             phaseIndex: currentPhaseIndex,
             phaseName:
-              currentPhaseIndex === 0
-                ? "OG / GTD Mint (Phase 1)"
-                : currentPhaseIndex === 1
-                  ? "FCFS Mint (Phase 2)"
-                  : currentPhaseIndex === 2
-                    ? "Public Mint (Phase 3)"
-                    : "Minting Paused",
+              currentPhaseIndex === -2
+                ? `Please Wait`
+                : currentPhaseIndex === 0
+                  ? "OG / GTD Mint (Phase 1)"
+                  : currentPhaseIndex === 1
+                    ? "FCFS Mint (Phase 2)"
+                    : currentPhaseIndex === 2
+                      ? "Public Mint (Phase 3)"
+                      : "Minting Paused",
             startTime: phase.startTime,
             endTime: phase.endTime,
             active: true,
@@ -666,7 +671,9 @@ export default function MintPage() {
             setPhaseInfo({
               phaseIndex: currentPhaseIndex,
               phaseName:
-                currentPhaseIndex === 0
+              currentPhaseIndex === -2
+                ? `Please Wait`
+                : currentPhaseIndex === 0
                   ? "OG / GTD Mint (Phase 1)"
                   : currentPhaseIndex === 1
                     ? "FCFS Mint (Phase 2)"
@@ -747,6 +754,14 @@ export default function MintPage() {
       fetchContractData(contract, walletAddress)
     }
   }, [refreshCounter, isConnected, isLoading, contract, walletAddress])
+
+  useEffect(() => {
+    const timer = setInterval(() => {
+      setTimeLeft(getTimeTillMinting(mintStartTime));
+    }, 1000);
+
+    return () => clearInterval(timer); // cleanup
+  }, []);
 
   // Increment mint amount
   const incrementMintAmount = () => {
@@ -993,7 +1008,15 @@ export default function MintPage() {
                   </div>
                 ) : (
                   <div className="text-center py-2">
-                    {phaseIndex === -1 ? (
+                    {phaseIndex === -2 ? (
+                      timeLeft.total > 0 ? (
+                        <p className="text-yellow-300">
+                          Minting will begin in {timeLeft.days}d {timeLeft.hours}h {timeLeft.minutes}m {timeLeft.seconds}s
+                        </p>
+                      ) : (
+                        <p className="text-yellow-300">Waiting for the contract data to change</p>
+                      )
+                    ) : phaseIndex === -1 ? (
                       <p className="text-yellow-300">The minting is paused</p>
                     ) : !isPhaseActive() ? (
                       <p className="text-yellow-300">This mint phase has ended</p>
