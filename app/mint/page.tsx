@@ -60,7 +60,7 @@ export default function MintPage() {
     categories: any[]
   }>({
     phaseIndex: -2,
-    phaseName: "Mint starting soon",
+    phaseName: "Mint Starting Soon",
     startTime: 0,
     endTime: 0,
     active: false,
@@ -85,7 +85,7 @@ export default function MintPage() {
     price: ethers.parseEther("3"),
   })
   const [timeRemaining, setTimeRemaining] = useState<string>("")
-  const [mintPrice, setMintPrice] = useState<string>("2.0 HYPE")
+  const [mintPrice, setMintPrice] = useState<string>("3.0 $HYPE")
   const [refreshCounter, setRefreshCounter] = useState<number>(0)
   const [selectedCategory, setSelectedCategory] = useState<number>(0)
   const [showDegenSurprise, setShowDegenSurprise] = useState<boolean>(false)
@@ -232,7 +232,7 @@ export default function MintPage() {
             phaseIndex: currentPhaseIndex,
             phaseName:
               currentPhaseIndex === -2
-                ? "Mint starting soon"
+                ? "Mint Starting Soon"
                 : currentPhaseIndex === 0
                   ? "OG / GTD Mint (Phase 1)"
                   : currentPhaseIndex === 1
@@ -249,7 +249,7 @@ export default function MintPage() {
           // Set mint price based on selected category
           if (phase.categories.length > selectedCategory) {
             const categoryPrice = ethers.formatEther(phase.categories[selectedCategory].price.toString())
-            setMintPrice(`${categoryPrice} HYPE`)
+            setMintPrice(`${categoryPrice} $HYPE`)
           }
         }
       }
@@ -364,8 +364,6 @@ export default function MintPage() {
 
       // For GTD and FCFS phases, we need to check eligibility and generate merkle proofs
       if (phaseIndex < 2) {
-        console.log(phaseInfo)
-        console.log(userPhaseInfo)
         if (!userPhaseInfo.isUserEligibleInCurrentPhase) {
           throw new Error("NotEligible: You are not eligible for this mint phase")
         }
@@ -418,7 +416,7 @@ export default function MintPage() {
       );
       await tx.wait();
 
-      setSuccess(`Successfully minted ${mintAmount} HYCHAN NFT${mintAmount > 1 ? "s" : ""}!`)
+      setSuccess(`Successfully minted ${mintAmount} HYCHAN!`)
 
       // Refresh data after successful mint
       setRefreshCounter((prev) => prev + 1)
@@ -483,7 +481,7 @@ export default function MintPage() {
       // Wait for transaction to be mined
       await tx.wait()
 
-      setSuccess(`Successfully minted a DEGEN HYCHAN NFT!`)
+      setSuccess(`Successfully minted a DEGEN HYCHAN!`)
 
       // Refresh data after successful mint
       setRefreshCounter((prev) => prev + 1)
@@ -672,7 +670,7 @@ export default function MintPage() {
               phaseIndex: currentPhaseIndex,
               phaseName:
               currentPhaseIndex === -2
-                ? "Mint starting soon"
+                ? "Mint Starting Soon"
                 : currentPhaseIndex === 0
                   ? "OG / GTD Mint (Phase 1)"
                   : currentPhaseIndex === 1
@@ -689,7 +687,7 @@ export default function MintPage() {
             // Set mint price based on selected category
             if (phase.categories.length > selectedCategory) {
               const categoryPrice = ethers.formatEther(phase.categories[selectedCategory].price.toString())
-              setMintPrice(`${categoryPrice} HYPE`)
+              setMintPrice(`${categoryPrice} $HYPE`)
             }
           }
         }
@@ -914,7 +912,7 @@ export default function MintPage() {
 
               <div className="flex justify-between items-center text-sm mt-1">
                 <span>
-                  {supplyInfo.totalSupply} / {supplyInfo.maxSupply}
+                  {supplyInfo.totalSupply} Minted
                 </span>
                 <span>{supplyInfo.remainingSupply} remaining</span>
               </div>
@@ -946,10 +944,12 @@ export default function MintPage() {
                 )}
 
                 <div className="mb-6">
-                  <div className="flex justify-between items-center mb-2">
-                    <span>Price per NFT:</span>
-                    <span className="font-bold">{mintPrice}</span>
-                  </div>
+                  {phaseIndex >= 0 && (
+                      <div className="flex justify-between items-center mb-2">
+                      <span>Price:</span>
+                      <span className="font-bold">{mintPrice}</span>
+                    </div>
+                  )}
 
                   {userPhaseInfo.categories && userPhaseInfo.categories.length > selectedCategory && (
                     <>
@@ -1002,7 +1002,7 @@ export default function MintPage() {
                           Minting...
                         </>
                       ) : (
-                        `Mint ${mintAmount} NFT${mintAmount > 1 ? "s" : ""} (${Number(mintPrice.split(" ")[0]) * mintAmount} HYPE)`
+                        `Mint ${mintAmount} (${Number(mintPrice.split(" ")[0]) * mintAmount} $HYPE)`
                       )}
                     </button>
                   </div>
@@ -1033,7 +1033,7 @@ export default function MintPage() {
                 )}
 
                 {/* Surprise Degen Mint Button - Only show if user is eligible */}
-                {(showDegenSurprise && userPhaseInfo.isUserEligibleInCurrentPhase && userPhaseInfo?.categories?.[selectedCategory]?.remainingMints === 0) || !userPhaseInfo.isUserEligibleInCurrentPhase && (
+                {((showDegenSurprise && userPhaseInfo.isUserEligibleInCurrentPhase && userPhaseInfo?.categories?.[selectedCategory]?.remainingMints === 0) || !userPhaseInfo.isUserEligibleInCurrentPhase) && (
                   <div className="mt-6 border-t border-white/10 pt-6">
                     {!isDegenRevealed ? (
                       <button
@@ -1053,7 +1053,7 @@ export default function MintPage() {
                           </h3>
                           <p className="text-sm mb-3">
                             Congratulations! You've unlocked the special Degen Mint. This is a limited opportunity to
-                            mint a rare HYCHAN NFT.
+                            mint a rare HYCHAN.
                           </p>
                           <div className="mt-4 h-2 bg-zinc-800 rounded-full overflow-hidden">
                             <div
@@ -1095,7 +1095,7 @@ export default function MintPage() {
                             ) : (
                               <>
                                 <Gift className="h-5 w-5" />
-                                Mint Degen NFT
+                                Mint Degen
                               </>
                             )}
                           </button>
@@ -1126,7 +1126,7 @@ export default function MintPage() {
               </div>
             ) : (
               <div className="text-center py-6">
-                <p className="mb-4">Connect your wallet using the button in the navbar to mint HYCHAN NFTs</p>
+                <p className="mb-4">Connect your wallet using the button in the navbar to mint HYCHAN</p>
               </div>
             )}
           </div>
@@ -1141,7 +1141,7 @@ export default function MintPage() {
               >
                 <h4 className="font-bold">OG / GTD Mint (Phase 1)</h4>
                 <p className="text-sm opacity-80 mt-1">
-                  Guaranteed mint for whitelisted wallets. Max 2 per wallet.
+                  Guaranteed mint for whitelisted wallets. 3 $HYPE, Max 2 per wallet.
                 </p>
               </div>
 
@@ -1150,7 +1150,7 @@ export default function MintPage() {
               >
                 <h4 className="font-bold">FCFS Mint (Phase 2)</h4>
                 <p className="text-sm opacity-80 mt-1">
-                  First come, first served mint for whitelisted wallets. Max 1 per wallet.
+                  First come, first served mint for whitelisted wallets. 3 $HYPE, Max 1 per wallet.
                 </p>
               </div>
 
@@ -1158,7 +1158,7 @@ export default function MintPage() {
                 className={`p-4 rounded-md border ${phaseInfo.phaseIndex === 2 ? "bg-teal-700/60 border-teal-400/50" : "bg-teal-900/40 border-white/10"}`}
               >
                 <h4 className="font-bold">Public Mint (Phase 3)</h4>
-                <p className="text-sm opacity-80 mt-1">Open to everyone. Max 1 per wallet.</p>
+                <p className="text-sm opacity-80 mt-1">Open to everyone. 4 $HYPE, Max 1 per wallet.</p>
               </div>
             </div>
           </div>
