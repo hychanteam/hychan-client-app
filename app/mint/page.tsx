@@ -60,7 +60,7 @@ export default function MintPage() {
     categories: any[]
   }>({
     phaseIndex: -2,
-    phaseName: "Please Wait",
+    phaseName: "Mint starting soon",
     startTime: 0,
     endTime: 0,
     active: false,
@@ -232,7 +232,7 @@ export default function MintPage() {
             phaseIndex: currentPhaseIndex,
             phaseName:
               currentPhaseIndex === -2
-                ? `Please Wait`
+                ? "Mint starting soon"
                 : currentPhaseIndex === 0
                   ? "OG / GTD Mint (Phase 1)"
                   : currentPhaseIndex === 1
@@ -672,7 +672,7 @@ export default function MintPage() {
               phaseIndex: currentPhaseIndex,
               phaseName:
               currentPhaseIndex === -2
-                ? `Please Wait`
+                ? "Mint starting soon"
                 : currentPhaseIndex === 0
                   ? "OG / GTD Mint (Phase 1)"
                   : currentPhaseIndex === 1
@@ -1014,7 +1014,7 @@ export default function MintPage() {
                           Minting will begin in {timeLeft.days}d {timeLeft.hours}h {timeLeft.minutes}m {timeLeft.seconds}s
                         </p>
                       ) : (
-                        <p className="text-yellow-300">Waiting for the contract data to change</p>
+                        <p className="text-yellow-300">Ready ?</p>
                       )
                     ) : phaseIndex === -1 ? (
                       <p className="text-yellow-300">The minting is paused</p>
@@ -1141,7 +1141,7 @@ export default function MintPage() {
               >
                 <h4 className="font-bold">OG / GTD Mint (Phase 1)</h4>
                 <p className="text-sm opacity-80 mt-1">
-                  Guaranteed mint for whitelisted wallets. 2 HYPE per NFT, max 2 per wallet.
+                  Guaranteed mint for whitelisted wallets. Max 2 per wallet.
                 </p>
               </div>
 
@@ -1150,7 +1150,7 @@ export default function MintPage() {
               >
                 <h4 className="font-bold">FCFS Mint (Phase 2)</h4>
                 <p className="text-sm opacity-80 mt-1">
-                  First come, first served mint for whitelisted wallets. 2 HYPE per NFT, max 1 per wallet.
+                  First come, first served mint for whitelisted wallets. Max 1 per wallet.
                 </p>
               </div>
 
@@ -1158,7 +1158,7 @@ export default function MintPage() {
                 className={`p-4 rounded-md border ${phaseInfo.phaseIndex === 2 ? "bg-teal-700/60 border-teal-400/50" : "bg-teal-900/40 border-white/10"}`}
               >
                 <h4 className="font-bold">Public Mint (Phase 3)</h4>
-                <p className="text-sm opacity-80 mt-1">Open to everyone. 2 HYPE per NFT, max 1 per wallet.</p>
+                <p className="text-sm opacity-80 mt-1">Open to everyone. Max 1 per wallet.</p>
               </div>
             </div>
           </div>
