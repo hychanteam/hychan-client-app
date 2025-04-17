@@ -30,6 +30,7 @@ import {
   handleCustomContractError,
 } from "../../lib/contract"
 import { FaDiscord } from "react-icons/fa"
+import { getRequiredChain } from "@/lib/client-utils"
 
 export default function MintPage() {
   const mintStartTime = new Date("2025-04-26T17:00:00Z"); // 5PM UTC
@@ -143,8 +144,9 @@ export default function MintPage() {
     try {
       if (window.ethereum) {
         const provider = new ethers.BrowserProvider(window.ethereum)
-        const accounts = await provider.send("eth_requestAccounts", [])
+        switchToRequiredNetwork(provider);
 
+        const accounts = await provider.send("eth_requestAccounts", [])
         if (accounts.length > 0) {
           initConnection(provider, accounts)
         }
@@ -600,6 +602,9 @@ export default function MintPage() {
         const provider = new ethers.BrowserProvider(window.ethereum)
         setProvider(provider)
 
+        // switch to required network
+        switchToRequiredNetwork(provider);
+
         // Initialize contract
         const contract = await getContract(provider)
         setContract(contract)
@@ -615,8 +620,9 @@ export default function MintPage() {
     if (window.ethereum) {
       try {
         const provider = new ethers.BrowserProvider(window.ethereum)
-        const accounts = await provider.send("eth_accounts", [])
+        switchToRequiredNetwork(provider);
 
+        const accounts = await provider.send("eth_accounts", [])
         if (accounts.length > 0) {
           initConnection(provider, accounts)
           return true
@@ -627,6 +633,39 @@ export default function MintPage() {
     }
 
     return false
+  }
+
+  const switchToRequiredNetwork = async (provider: ethers.BrowserProvider) =>{
+    const network = await provider.getNetwork();
+    const required = getRequiredChain();
+
+    if ((network.chainId !== BigInt(required.chainId)) && window.ethereum) {
+      try {
+        // Try switching to the required network
+        await window.ethereum.request({
+          method: 'wallet_switchEthereumChain',
+          params: [{ chainId: required.chainId }],
+        });
+      } catch (switchError: any) {
+        if (switchError.code === 4902) {
+          // Chain not added to wallet? Try adding it.
+          try {
+            await window.ethereum.request({
+              method: 'wallet_addEthereumChain',
+              params: [required],
+            });
+          } catch (addError) {
+            console.error("Failed to add network:", addError);
+            setError("Failed to add network. Please try manually.");
+            return;
+          }
+        } else {
+          console.error("Failed to switch network:", switchError);
+          setError("Please switch to the correct network manually.");
+          return;
+        }
+      }
+    }
   }
 
   // Check Discord credentials
@@ -650,6 +689,8 @@ export default function MintPage() {
       // If we have window.ethereum but no contract yet, initialize it
       if (window.ethereum && !contract) {
         const provider = new ethers.BrowserProvider(window.ethereum)
+        switchToRequiredNetwork(provider);
+        
         const contractInstance = await getContract(provider)
         setContract(contractInstance)
 
