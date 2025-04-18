@@ -99,6 +99,9 @@ export default function MintPage() {
   const [discordId, setDiscordId] = useState<string | null>(null)
   const [discordUsername, setDiscordUsername] = useState<string | null>(null)
 
+  // Poll refs
+  const supplyPollIntervalRef = useRef<NodeJS.Timeout | null>(null);
+
   // Ref to track initialization steps
   const initSteps = useRef({
     walletChecked: false,
@@ -689,6 +692,14 @@ export default function MintPage() {
       // If we have a contract and wallet address, fetch data
       if (contract && walletAddress) {
         await fetchContractData(contract, walletAddress)
+
+        // Call every 2 second
+        // Clear existing interval first before setting another one
+        if (supplyPollIntervalRef.current) clearInterval(supplyPollIntervalRef.current)
+        supplyPollIntervalRef.current = setInterval(() => {
+          pollSupplyInfo(contract)
+        }, 2000)
+
         return true
       }
 
@@ -700,8 +711,10 @@ export default function MintPage() {
         const contractInstance = await getContract(provider)
         setContract(contractInstance)
 
-        // Call every 1 second
-        setInterval(() => {
+        // Call every 2 second
+        // Clear existing interval first before setting another one
+        if (supplyPollIntervalRef.current) clearInterval(supplyPollIntervalRef.current)
+        supplyPollIntervalRef.current = setInterval(() => {
           pollSupplyInfo(contractInstance)
         }, 2000)
 
@@ -771,6 +784,7 @@ export default function MintPage() {
       window.ethereum.on("accountsChanged", handleAccountsChanged)
 
       return () => {
+        if (supplyPollIntervalRef.current) clearInterval(supplyPollIntervalRef.current);
         window.ethereum?.removeListener("accountsChanged", handleAccountsChanged)
       }
     }
