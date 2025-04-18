@@ -887,7 +887,7 @@ export default function MintPage() {
 
       <div className="container mx-auto px-4 py-6 flex-1 flex flex-col relative z-10">
         <header className="flex justify-between items-center h-12">
-        <Link href="/" className="flex items-center text-white hover:text-teal-300 transition-colors">
+        <Link href="https://hychan.xyz" className="flex items-center text-white hover:text-teal-300 transition-colors">
           <ArrowLeft className="mr-2" size={20} />
           <span>
             <span className="hidden md:inline">Back to Home</span>
