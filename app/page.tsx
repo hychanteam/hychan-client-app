@@ -218,6 +218,12 @@ export default function MintPage() {
     return phaseInfo.active && phaseInfo.endTime > now
   }
 
+  // Check supply info every x second
+  const pollSupplyInfo = async (contractInstance: ethers.Contract) => {
+    const supply = await getSupplyInfo(contractInstance)
+    setSupplyInfo(supply)
+  }
+
   // Fetch contract data
   const fetchContractData = async (contractInstance: ethers.Contract, address: string) => {
     try {
@@ -693,6 +699,11 @@ export default function MintPage() {
         
         const contractInstance = await getContract(provider)
         setContract(contractInstance)
+
+        // Call every 1 second
+        setInterval(() => {
+          pollSupplyInfo(contractInstance)
+        }, 2000)
 
         // Get current phase index
         const currentPhaseIndex = await getCurrentPhaseIndex(contractInstance)
