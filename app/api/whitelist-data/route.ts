@@ -49,7 +49,7 @@ export async function POST(request: NextRequest) {
         console.error("Error generating Merkle proof:", error)
         return NextResponse.json(
           { error: "Failed to generate Merkle proof" },
-          { status: 500 }
+          { status: 400 }
         )
       }
     }
@@ -67,8 +67,7 @@ export async function POST(request: NextRequest) {
       .single()
 
     if (error) {
-      console.error("Database query error:", error)
-      return NextResponse.json({ error: "Failed to fetch whitelist data" }, { status: 500 })
+      return NextResponse.json({ error: "Failed to fetch whitelist data" }, { status: 400 })
     }
 
     // If no data found, return empty values
